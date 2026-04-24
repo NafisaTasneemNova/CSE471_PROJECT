@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login - TexBid</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 min-h-screen flex items-center justify-center">
+    <div class="w-full max-w-md px-6">
+        <!-- Logo and Title -->
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center gap-3 mb-4">
+                <div class="bg-blue-600 p-3 rounded-xl">
+                    <svg class="h-8 w-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                    </svg>
+                </div>
+            </div>
+            <h1 class="text-3xl font-bold text-white mb-2">Admin Access</h1>
+            <p class="text-slate-400">Authorized personnel only</p>
+        </div>
+
+        <!-- Login Form -->
+        <div class="bg-slate-800 rounded-2xl shadow-2xl p-8 border border-slate-700">
+            <form id="admin-login-form" class="space-y-6">
+                <!-- Email -->
+                <div>
+                    <label class="block text-sm font-semibold text-slate-300 mb-2">Admin Email</label>
+                    <input 
+                        type="email" 
+                        id="email" 
+                        required
+                        class="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        placeholder="admin@texbid.com"
+                    >
+                </div>
+
+                <!-- Password -->
+                <div>
+                    <label class="block text-sm font-semibold text-slate-300 mb-2">Password</label>
+                    <input 
+                        type="password" 
+                        id="password" 
+                        required
+                        class="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        placeholder="••••••••"
+                    >
+                </div>
+
+                <!-- Error Message -->
+                <div id="error-message" class="hidden bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded-lg text-sm">
+                    <div class="flex items-center gap-2">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span id="error-text"></span>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <button 
+                    type="submit" 
+                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-lg"
+                >
+                    <span id="login-text">Sign In</span>
+                    <span id="login-spinner" class="hidden">
+                        <svg class="animate-spin h-5 w-5 inline-block" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Signing in...
+                    </span>
+                </button>
+            </form>
+
+            <!-- Back to Main Site -->
+            <div class="mt-6 text-center">
+                <a href="/login" class="text-sm text-slate-400 hover:text-blue-400 transition-colors">
+                    ← Back to regular login
+                </a>
+            </div>
+        </div>
+
+        <!-- Security Notice -->
+        <div class="mt-6 text-center text-xs text-slate-500">
+            <p>🔒 This area is restricted to authorized administrators only.</p>
+            <p>All access attempts are logged and monitored.</p>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('admin-login-form');
+        const errorMessage = document.getElementById('error-message');
+        const errorText = document.getElementById('error-text');
+        const loginText = document.getElementById('login-text');
+        const loginSpinner = document.getElementById('login-spinner');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // Hide error
+            errorMessage.classList.add('hidden');
+            
+            // Show loading
+            loginText.classList.add('hidden');
+            loginSpinner.classList.remove('hidden');
+
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const response = await fetch('/api/admin/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    // Redirect to admin dashboard
+                    window.location.href = '/admin/dashboard';
+                } else {
+                    // Show error
+                    errorText.textContent = data.error || 'Invalid credentials or insufficient permissions';
+                    errorMessage.classList.remove('hidden');
+                }
+            } catch (error) {
+                errorText.textContent = 'Connection error. Please try again.';
+                errorMessage.classList.remove('hidden');
+            } finally {
+                // Hide loading
+                loginText.classList.remove('hidden');
+                loginSpinner.classList.add('hidden');
+            }
+        });
+    </script>
+</body>
+</html>

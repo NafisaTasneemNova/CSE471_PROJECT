@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple Test</title>
+</head>
+<body>
+    <h1>Simple Test Page</h1>
+    
+    <button onclick="alert('This works!')">Click Me</button>
+    
+    <br><br>
+    
+    <button id="testBtn">Click Me Too</button>
+    
+    <script>
+        document.getElementById('testBtn').addEventListener('click', function() {
+            alert('Event listener works!');
+        });
+    </script>
+</body>
+</html>
