@@ -9,16 +9,228 @@ import hashlib
 import secrets
 
 from database import connect_to_mongo, close_mongo_connection, db
-from models import RoleEnum, OverallStatusEnum, CompanyModel, LegalAndCapacityModel, CertificationModel, CertTypeEnum, VerificationStatusEnum, RFQModel, RFQStatusEnum, BidModel, SubscriptionTierEnum, UserModel, NotificationModel, NotificationTypeEnum
+from models import RoleEnum, OverallStatusEnum, CompanyModel, LegalAndCapacityModel, CertificationModel, CertTypeEnum, VerificationStatusEnum, RFQModel, RFQStatusEnum, BidModel, SubscriptionTierEnum, UserModel, NotificationModel, NotificationTypeEnum, EscrowStatusEnum, PaymentModel, ShippingCalculateRequest, ShippingRateModel, ShippingMethodEnum, IncotermEnum, ContractModel, ContractStatusEnum
 import io
 import math
 from colorthief import ColorThief
 from datetime import datetime, timedelta
 
+
+# ----------------------------------------
+# PORT SEEDING
+# ----------------------------------------
+
+SEED_PORTS = [
+    {"code": "BDCGP", "name": "Chittagong", "country": "Bangladesh", "region": "Asia", "distance_factor": 1.0},
+    {"code": "BDMGL", "name": "Mongla", "country": "Bangladesh", "region": "Asia", "distance_factor": 1.0},
+    {"code": "CNSHA", "name": "Shanghai", "country": "China", "region": "Asia", "distance_factor": 1.1},
+    {"code": "CNTAO", "name": "Qingdao", "country": "China", "region": "Asia", "distance_factor": 1.1},
+    {"code": "CNNGB", "name": "Ningbo", "country": "China", "region": "Asia", "distance_factor": 1.1},
+    {"code": "CNSZX", "name": "Shenzhen", "country": "China", "region": "Asia", "distance_factor": 1.1},
+    {"code": "INBOM", "name": "Mumbai", "country": "India", "region": "Asia", "distance_factor": 1.2},
+    {"code": "INNSA", "name": "Nhava Sheva", "country": "India", "region": "Asia", "distance_factor": 1.2},
+    {"code": "PKKAR", "name": "Karachi", "country": "Pakistan", "region": "Asia", "distance_factor": 1.2},
+    {"code": "LKCMB", "name": "Colombo", "country": "Sri Lanka", "region": "Asia", "distance_factor": 1.15},
+    {"code": "VNSGN", "name": "Ho Chi Minh City", "country": "Vietnam", "region": "Asia", "distance_factor": 1.05},
+    {"code": "IDJKT", "name": "Jakarta", "country": "Indonesia", "region": "Asia", "distance_factor": 1.1},
+    {"code": "MYPKG", "name": "Port Klang", "country": "Malaysia", "region": "Asia", "distance_factor": 1.1},
+    {"code": "SGSIN", "name": "Singapore", "country": "Singapore", "region": "Asia", "distance_factor": 1.0},
+    {"code": "TRIST", "name": "Istanbul", "country": "Turkey", "region": "Europe", "distance_factor": 2.0},
+    {"code": "NLRTM", "name": "Rotterdam", "country": "Netherlands", "region": "Europe", "distance_factor": 2.5},
+    {"code": "DEHAM", "name": "Hamburg", "country": "Germany", "region": "Europe", "distance_factor": 2.5},
+    {"code": "GBFXT", "name": "Felixstowe", "country": "United Kingdom", "region": "Europe", "distance_factor": 2.6},
+    {"code": "FRMRS", "name": "Marseille", "country": "France", "region": "Europe", "distance_factor": 2.4},
+    {"code": "ITGOA", "name": "Genoa", "country": "Italy", "region": "Europe", "distance_factor": 2.4},
+    {"code": "USNYC", "name": "New York", "country": "United States", "region": "Americas", "distance_factor": 3.5},
+    {"code": "USLAX", "name": "Los Angeles", "country": "United States", "region": "Americas", "distance_factor": 3.2},
+    {"code": "CAYVR", "name": "Vancouver", "country": "Canada", "region": "Americas", "distance_factor": 3.3},
+    {"code": "BRSSZ", "name": "Santos", "country": "Brazil", "region": "Americas", "distance_factor": 3.8},
+    {"code": "AUPOL", "name": "Port of Melbourne", "country": "Australia", "region": "Oceania", "distance_factor": 2.8},
+    {"code": "ZASPE", "name": "Cape Town", "country": "South Africa", "region": "Africa", "distance_factor": 3.0},
+    {"code": "EGPSD", "name": "Port Said", "country": "Egypt", "region": "Africa", "distance_factor": 2.2},
+]
+
+DEFAULT_RATES = [
+    {"origin_region": "Asia", "dest_region": "Asia", "method": "SEA", "base_rate_per_kg": 0.80},
+    {"origin_region": "Asia", "dest_region": "Asia", "method": "AIR", "base_rate_per_kg": 4.50},
+    {"origin_region": "Asia", "dest_region": "Asia", "method": "ROAD", "base_rate_per_kg": 1.20},
+    {"origin_region": "Asia", "dest_region": "Europe", "method": "SEA", "base_rate_per_kg": 1.80},
+    {"origin_region": "Asia", "dest_region": "Europe", "method": "AIR", "base_rate_per_kg": 7.50},
+    {"origin_region": "Asia", "dest_region": "Americas", "method": "SEA", "base_rate_per_kg": 2.20},
+    {"origin_region": "Asia", "dest_region": "Americas", "method": "AIR", "base_rate_per_kg": 9.00},
+    {"origin_region": "Asia", "dest_region": "Oceania", "method": "SEA", "base_rate_per_kg": 1.60},
+    {"origin_region": "Asia", "dest_region": "Africa", "method": "SEA", "base_rate_per_kg": 2.00},
+    {"origin_region": "Europe", "dest_region": "Europe", "method": "SEA", "base_rate_per_kg": 0.60},
+    {"origin_region": "Europe", "dest_region": "Europe", "method": "ROAD", "base_rate_per_kg": 0.90},
+    {"origin_region": "Europe", "dest_region": "Americas", "method": "SEA", "base_rate_per_kg": 1.50},
+    {"origin_region": "Americas", "dest_region": "Americas", "method": "SEA", "base_rate_per_kg": 0.70},
+    {"origin_region": "Americas", "dest_region": "Europe", "method": "SEA", "base_rate_per_kg": 1.50},
+]
+
+INCOTERMS_DATA = {
+    "EXW": {
+        "name": "Ex Works",
+        "description": "The seller makes goods available at their premises. The buyer bears all costs and risks from that point.",
+        "seller_pays": [],
+        "buyer_pays": ["loading", "export_clearance", "main_carriage", "insurance", "import_duties", "last_mile"],
+        "seller_cost_multiplier": 0.0,
+        "includes_insurance": False,
+        "includes_duties": False,
+    },
+    "FOB": {
+        "name": "Free On Board",
+        "description": "Seller delivers goods on board the vessel at the named port of shipment. Risk transfers when goods are on board.",
+        "seller_pays": ["export_clearance", "loading", "port_charges"],
+        "buyer_pays": ["main_carriage", "insurance", "import_duties", "last_mile"],
+        "seller_cost_multiplier": 0.15,
+        "includes_insurance": False,
+        "includes_duties": False,
+    },
+    "CFR": {
+        "name": "Cost and Freight",
+        "description": "Seller pays freight to destination port. Risk transfers when goods are on board at origin.",
+        "seller_pays": ["export_clearance", "loading", "port_charges", "main_carriage"],
+        "buyer_pays": ["insurance", "import_duties", "last_mile"],
+        "seller_cost_multiplier": 1.0,
+        "includes_insurance": False,
+        "includes_duties": False,
+    },
+    "CIF": {
+        "name": "Cost, Insurance and Freight",
+        "description": "Seller pays freight and insurance to destination port. Risk transfers when goods are on board at origin.",
+        "seller_pays": ["export_clearance", "loading", "port_charges", "main_carriage", "insurance"],
+        "buyer_pays": ["import_duties", "last_mile"],
+        "seller_cost_multiplier": 1.0,
+        "includes_insurance": True,
+        "includes_duties": False,
+    },
+    "DAP": {
+        "name": "Delivered at Place",
+        "description": "Seller delivers goods to named destination, ready for unloading. Buyer pays import duties.",
+        "seller_pays": ["export_clearance", "loading", "main_carriage", "insurance", "destination_charges"],
+        "buyer_pays": ["import_duties", "unloading"],
+        "seller_cost_multiplier": 1.0,
+        "includes_insurance": True,
+        "includes_duties": False,
+    },
+    "DDP": {
+        "name": "Delivered Duty Paid",
+        "description": "Seller bears all costs including import duties and taxes to the named destination. Maximum seller responsibility.",
+        "seller_pays": ["export_clearance", "loading", "main_carriage", "insurance", "import_duties", "last_mile"],
+        "buyer_pays": [],
+        "seller_cost_multiplier": 1.0,
+        "includes_insurance": True,
+        "includes_duties": True,
+    },
+}
+
+TRANSIT_DAYS = {
+    ("Asia", "Asia", "SEA"): 14,
+    ("Asia", "Asia", "AIR"): 3,
+    ("Asia", "Asia", "ROAD"): 10,
+    ("Asia", "Europe", "SEA"): 28,
+    ("Asia", "Europe", "AIR"): 5,
+    ("Asia", "Americas", "SEA"): 35,
+    ("Asia", "Americas", "AIR"): 6,
+    ("Asia", "Oceania", "SEA"): 21,
+    ("Asia", "Africa", "SEA"): 25,
+    ("Europe", "Europe", "SEA"): 7,
+    ("Europe", "Europe", "ROAD"): 5,
+    ("Europe", "Americas", "SEA"): 14,
+    ("Americas", "Americas", "SEA"): 10,
+    ("Americas", "Europe", "SEA"): 14,
+}
+
+
+async def seed_ports():
+    """Seed the ports collection with major textile trade ports if empty."""
+    from database import db
+    if db is None:
+        print("⚠️  Port seeding skipped: database not available")
+        return
+
+    count = await db["ports"].count_documents({})
+    if count >= len(SEED_PORTS):
+        print(f"✅ Ports already seeded ({count} ports)")
+    else:
+        await db["ports"].delete_many({})
+        await db["ports"].insert_many(SEED_PORTS)
+        print(f"✅ Seeded {len(SEED_PORTS)} ports")
+
+    # Seed default rates if empty
+    rate_count = await db["shipping_rates"].count_documents({})
+    if rate_count == 0:
+        import uuid as _uuid
+        from datetime import datetime as _dt
+        rates_to_insert = []
+        for r in DEFAULT_RATES:
+            rates_to_insert.append({
+                "id": str(_uuid.uuid4()),
+                "origin_region": r["origin_region"],
+                "dest_region": r["dest_region"],
+                "method": r["method"],
+                "base_rate_per_kg": r["base_rate_per_kg"],
+                "updated_at": _dt.utcnow(),
+            })
+        await db["shipping_rates"].insert_many(rates_to_insert)
+        print(f"✅ Seeded {len(rates_to_insert)} default shipping rates")
+
+    # Seed global shipping config if not present
+    existing_config = await db["shipping_config"].find_one({"_id": "global"})
+    if not existing_config:
+        await db["shipping_config"].insert_one({
+            "_id": "global",
+            # Insurance
+            "insurance_rate": 0.003,          # 0.3% of freight cost
+            # Port / handling fees (flat USD per shipment)
+            "port_fee_sea": 320.0,
+            "port_fee_air": 180.0,
+            "port_fee_road": 90.0,
+            # Routing factors (multiplied onto base distance)
+            "routing_factor_sea": 1.2,
+            "routing_factor_air": 1.05,
+            "routing_factor_road": 1.3,
+            # Speed (km/h) for transit time estimation
+            "speed_sea_kmh": 37.0,
+            "speed_air_kmh": 800.0,
+            "speed_road_kmh": 60.0,
+            # Port handling days added to transit time
+            "handling_days_sea": 4.0,
+            "handling_days_air": 1.5,
+            "handling_days_road": 2.0,
+            # Min / max freight charge (USD) per shipment
+            "min_freight_sea": 150.0,
+            "max_freight_sea": 50000.0,
+            "min_freight_air": 80.0,
+            "max_freight_air": 30000.0,
+            "min_freight_road": 50.0,
+            "max_freight_road": 20000.0,
+            # Air freight distance zone thresholds (km) and rate multipliers
+            "air_zone_short_max_km": 3000.0,   # short-haul ≤ 3000 km
+            "air_zone_mid_max_km": 8000.0,     # mid-haul ≤ 8000 km
+            "air_zone_short_multiplier": 1.0,
+            "air_zone_mid_multiplier": 1.2,
+            "air_zone_long_multiplier": 1.5,
+            # Import duty estimate rate (used for DDP)
+            "import_duty_rate": 0.12,
+            "updated_at": datetime.utcnow().isoformat(),
+        })
+        print("✅ Seeded default shipping_config")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup logic
     await connect_to_mongo()
+    await seed_ports()
+    # Create TTL index on sessions collection so expired sessions auto-delete
+    from database import db as _db
+    if _db is not None:
+        try:
+            await _db["sessions"].create_index("expires_at", expireAfterSeconds=0)
+            print("✅ Sessions TTL index ensured")
+        except Exception:
+            pass
     yield
     # Shutdown logic
     await close_mongo_connection()
@@ -42,8 +254,8 @@ templates = Jinja2Templates(directory="../frontend/src/pages")
 # AUTHENTICATION HELPERS
 # ----------------------------------------
 
-# In-memory session store (in production, use Redis or database)
-sessions = {}
+# MongoDB-backed session store — survives server restarts
+# Sessions are stored in the 'sessions' collection with a 30-day TTL index
 
 def hash_password(password: str) -> str:
     """Hash password using SHA-256."""
@@ -53,37 +265,59 @@ def verify_password(password: str, password_hash: str) -> bool:
     """Verify password against hash."""
     return hash_password(password) == password_hash
 
-def create_session(user_id: str) -> str:
-    """Create a new session token."""
+async def create_session(user_id: str) -> str:
+    """Create a new session token and persist it to MongoDB."""
+    from database import db
     session_token = secrets.token_urlsafe(32)
-    sessions[session_token] = user_id
+    if db is not None:
+        await db["sessions"].update_one(
+            {"token": session_token},
+            {"$set": {
+                "token": session_token,
+                "user_id": user_id,
+                "created_at": datetime.utcnow(),
+                "expires_at": datetime.utcnow() + timedelta(days=30),
+            }},
+            upsert=True
+        )
     return session_token
 
-def get_user_from_session(session_token: Optional[str]) -> Optional[str]:
-    """Get user ID from session token."""
+async def get_user_from_session(session_token: Optional[str]) -> Optional[str]:
+    """Get user ID from session token stored in MongoDB."""
     if not session_token:
         return None
-    return sessions.get(session_token)
+    from database import db
+    if db is None:
+        return None
+    session = await db["sessions"].find_one({"token": session_token})
+    if not session:
+        return None
+    # Check expiry
+    expires_at = session.get("expires_at")
+    if expires_at and datetime.utcnow() > expires_at:
+        await db["sessions"].delete_one({"token": session_token})
+        return None
+    return session.get("user_id")
 
 async def get_current_user(session: Optional[str] = Cookie(None)):
     """Dependency to get current logged-in user."""
     if not session:
         return None
-    
-    user_id = get_user_from_session(session)
+
+    user_id = await get_user_from_session(session)
     if not user_id:
         return None
-    
+
     from database import db
     if db is None:
         return None
-    
+
     user = await db["users"].find_one({"id": user_id})
-    
+
     # Check and auto-downgrade expired PREMIUM subscriptions
     if user:
         await check_subscription_expiration(user)
-    
+
     return user
 
 async def check_subscription_expiration(user: dict):
@@ -328,10 +562,10 @@ async def login_user(
         {"id": user["id"]},
         {"$set": {"last_login": datetime.utcnow()}}
     )
-    
-    # Create session
-    session_token = create_session(user["id"])
-    
+
+    # Create session (persisted to MongoDB)
+    session_token = await create_session(user["id"])
+
     # Redirect to home with session cookie
     response = RedirectResponse(url="/", status_code=303)
     response.set_cookie(
@@ -340,15 +574,16 @@ async def login_user(
         httponly=True,
         max_age=86400 * 30  # 30 days
     )
-    
+
     return response
 
 @app.get("/logout")
 async def logout(session: Optional[str] = Cookie(None)):
-    """Log out user."""
-    if session and session in sessions:
-        del sessions[session]
-    
+    """Log out user — delete session from MongoDB."""
+    from database import db
+    if session and db is not None:
+        await db["sessions"].delete_one({"token": session})
+
     response = RedirectResponse(url="/", status_code=303)
     response.delete_cookie("session")
     return response
@@ -358,7 +593,7 @@ async def logout(session: Optional[str] = Cookie(None)):
 # ADMIN ROUTES
 # ----------------------------------------
 
-def require_admin(user: dict = Depends(require_login)):
+async def require_admin(user: dict = Depends(require_login)):
     """Dependency to require admin access."""
     if not user.get("is_admin", False):
         raise HTTPException(status_code=403, detail="Admin access required")
@@ -398,8 +633,8 @@ async def admin_login(
         {"$set": {"last_login": datetime.utcnow()}}
     )
     
-    # Create session
-    session_token = create_session(user["id"])
+    # Create session (persisted to MongoDB)
+    session_token = await create_session(user["id"])
     
     # Return success with session cookie
     response = JSONResponse({"success": True, "message": "Login successful"})
@@ -636,9 +871,9 @@ async def delete_account(request: Request, user: dict = Depends(require_login), 
         # Delete user
         await db["users"].delete_one({"id": user_id})
         
-        # Clear session
-        if session and session in sessions:
-            del sessions[session]
+        # Clear session from MongoDB
+        if session:
+            await db["sessions"].delete_one({"token": session})
         
         print(f"Account deleted: User={user.get('email')}, Company={company.get('name') if company else 'Unknown'}")
         
@@ -2085,22 +2320,186 @@ async def delete_rfq(rfq_id: str, user: dict = Depends(require_login)):
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
 
+@app.get("/dashboard", response_class=HTMLResponse)
+async def smart_dashboard(request: Request, user: Optional[dict] = Depends(get_current_user)):
+    """Redirect to the correct dashboard based on the user's role."""
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    from database import db
+    if db is not None:
+        company = await db["companies"].find_one({"id": user.get("company_id")})
+        if company:
+            role = company.get("role", "").upper()
+            if role == "SUPPLIER":
+                return RedirectResponse(url="/dashboard/supplier", status_code=303)
+            elif role == "BUYER":
+                return RedirectResponse(url="/dashboard/buyer", status_code=303)
+
+    return RedirectResponse(url="/dashboard/buyer", status_code=303)
+
+
+@app.get("/rfq/browse", response_class=HTMLResponse)
+async def rfq_browse_redirect(request: Request, user: Optional[dict] = Depends(get_current_user)):
+    """Smart Browse RFQs redirect — buyers see their dashboard, suppliers see the RFQ feed."""
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    from database import db
+    if db is not None:
+        company = await db["companies"].find_one({"id": user.get("company_id")})
+        if company:
+            role = company.get("role", "").upper()
+            if role == "SUPPLIER":
+                return RedirectResponse(url="/dashboard/supplier", status_code=303)
+            elif role == "BUYER":
+                return RedirectResponse(url="/dashboard/buyer", status_code=303)
+
+    return RedirectResponse(url="/dashboard/buyer", status_code=303)
+
+
+@app.get("/dashboard/buyer", response_class=HTMLResponse)
+async def buyer_dashboard(request: Request, user: dict = Depends(require_login)):
+    """Buyer dashboard — shows their RFQs, bids received, and payment statuses."""
+    from database import db
+    rfqs = []
+    payments = []
+    if db is not None:
+        company = await db["companies"].find_one({"id": user.get("company_id")})
+        buyer_id = user.get("id")
+        company_id = user.get("company_id")
+
+        # Fetch buyer's RFQs (match by multiple buyer_id formats)
+        async for rfq in db["rfqs"].find({
+            "$or": [
+                {"buyer_id": buyer_id},
+                {"buyer_id": company_id},
+                {"buyer_id": company.get("id") if company else None},
+                {"buyer_id": company.get("unique_id") if company else None},
+            ]
+        }).sort("created_at", -1):
+            rfq["_id"] = str(rfq["_id"])
+            # Count bids for this RFQ
+            rfq["bid_count"] = await db["bids"].count_documents({"rfq_id": rfq["id"]})
+            # Check if paid
+            payment = await db["payments"].find_one({
+                "order_id": rfq["id"],
+                "status": {"$in": ["PAID_IN_ESCROW", "RELEASED"]}
+            })
+            rfq["payment_status"] = payment.get("status") if payment else None
+            rfq["payment_id"] = payment.get("payment_id") if payment else None
+            rfqs.append(rfq)
+
+        # Fetch buyer's payments
+        async for p in db["payments"].find({"buyer_id": buyer_id}).sort("created_at", -1).limit(5):
+            p["_id"] = str(p["_id"])
+            payments.append(p)
+
+    return templates.TemplateResponse("buyer_dashboard.html", {
+        "request": request,
+        "user": user,
+        "rfqs": rfqs,
+        "payments": payments,
+    })
+
+
 @app.get("/dashboard/supplier", response_class=HTMLResponse)
 async def supplier_dashboard_feed(request: Request, user: Optional[dict] = Depends(get_current_user)):
     from database import db
-    
+
+    rfqs = []
+    orders = []  # accepted bids + paid orders
+
+    if db is not None:
+        # Open RFQs for browsing
+        async for document in db["rfqs"].find({"status": "OPEN"}).sort("created_at", -1):
+            document['_id'] = str(document['_id'])
+            rfqs.append(document)
+
+        if user:
+            company = await db["companies"].find_one({"id": user.get("company_id")})
+            company_role = company.get("role", "").upper() if company else ""
+
+            # Only show orders/bids section for SUPPLIER accounts
+            if company_role == "SUPPLIER":
+                supplier_id = company.get("unique_id") or company.get("id") if company else user.get("id")
+
+                # Fetch all bids by this supplier (accepted, confirmed, or with payments)
+                async for bid in db["bids"].find({
+                    "supplier_id": supplier_id,
+                    "status": {"$in": ["ACCEPTED", "CONFIRMED", "ACTIVE"]}
+                }):
+                    rfq = await db["rfqs"].find_one({"id": bid.get("rfq_id")})
+                    if not rfq:
+                        continue
+
+                    # Check for payment linked to this specific bid
+                    payment = await db["payments"].find_one({
+                        "order_id": bid.get("rfq_id"),
+                        "bid_id": bid.get("id"),
+                        "status": {"$in": [
+                            "PAID_IN_ESCROW", "WORK_IN_PROGRESS",
+                            "SENT_FOR_DELIVERY", "RELEASED"
+                        ]}
+                    })
+
+                    if bid.get("status") in ("ACCEPTED", "CONFIRMED") or payment:
+                        if payment:
+                            payment["_id"] = str(payment["_id"])
+                        orders.append({
+                            "bid": bid,
+                            "payment": payment,
+                            "rfq": rfq,
+                        })
+                
+                # Also fetch bids that have payments but might not be in ACCEPTED/CONFIRMED status anymore
+                async for payment in db["payments"].find({
+                    "supplier_id": supplier_id,
+                    "status": {"$in": [
+                        "PAID_IN_ESCROW", "WORK_IN_PROGRESS",
+                        "SENT_FOR_DELIVERY", "RELEASED"
+                    ]}
+                }):
+                    # Check if we already have this order
+                    bid_id = payment.get("bid_id")
+                    if bid_id and not any(o["bid"].get("id") == bid_id for o in orders):
+                        bid = await db["bids"].find_one({"id": bid_id})
+                        if bid:
+                            rfq = await db["rfqs"].find_one({"id": bid.get("rfq_id")})
+                            if rfq:
+                                payment["_id"] = str(payment["_id"])
+                                orders.append({
+                                    "bid": bid,
+                                    "payment": payment,
+                                    "rfq": rfq,
+                                })
+
+    return templates.TemplateResponse("supplier_dashboard.html", {
+        "request": request,
+        "rfqs": rfqs,
+        "orders": orders,
+        "user": user,
+    })
+
+
+@app.get("/rfq/feed", response_class=HTMLResponse)
+async def rfq_feed_page(request: Request, user: Optional[dict] = Depends(get_current_user)):
+    """Browse all open RFQs - accessible to both buyers and suppliers."""
+    from database import db
+
     rfqs = []
     if db is not None:
-        # Sort by newest created
-        cursor = db["rfqs"].find({"status": "OPEN"}).sort("created_at", -1)
-        # Natively render the documents to dicts directly for the template
-        async for document in cursor:
-            # Reformat UUID and datetime objects to strings if necessary natively, 
-            # though Jinja can handle standard python datetimes natively.
-            document['_id'] = str(document['_id']) 
+        # Fetch all open RFQs
+        async for document in db["rfqs"].find({"status": "OPEN"}).sort("created_at", -1):
+            document['_id'] = str(document['_id'])
             rfqs.append(document)
-        
-    return templates.TemplateResponse("supplier_dashboard.html", {"request": request, "rfqs": rfqs, "user": user})
+
+    return templates.TemplateResponse("rfq_feed.html", {
+        "request": request,
+        "rfqs": rfqs,
+        "user": user,
+    })
+
 
 @app.post("/quote/submit")
 async def submit_quote(request: Request):
@@ -2956,35 +3355,97 @@ async def rfq_detail_page(request: Request, rfq_id: str, user: Optional[dict] = 
         # Check if current user is the owner
         is_owner = False
         if user:
-            # Check if user's company_id matches the buyer_id of the RFQ
-            # Or check if the RFQ was created by this user
             user_company = await db["companies"].find_one({"id": user.get("company_id")})
-            
-            # Debug: Print ownership check details
-            print(f"🔍 Ownership Check:")
-            print(f"   RFQ buyer_id: {rfq.get('buyer_id')}")
-            print(f"   User ID: {user.get('id')}")
-            print(f"   User company_id: {user.get('company_id')}")
-            if user_company:
-                print(f"   Company ID: {user_company.get('id')}")
-                print(f"   Company unique_id: {user_company.get('unique_id')}")
-            
-            # Match by multiple criteria
+
             is_owner = (
-                rfq.get("buyer_id") == user.get("id") or  # Direct user ID match
-                rfq.get("buyer_id") == user.get("company_id") or  # Company ID match
-                (user_company and rfq.get("buyer_id") == user_company.get("id")) or  # Company doc ID match
-                (user_company and rfq.get("buyer_id") == user_company.get("unique_id")) or  # Company unique_id match
-                rfq.get("buyer_id") == "SIMULATED_BUYER_123"  # Legacy: treat all simulated RFQs as owned by logged-in users
+                rfq.get("buyer_id") == user.get("id") or
+                rfq.get("buyer_id") == user.get("company_id") or
+                (user_company and rfq.get("buyer_id") == user_company.get("id")) or
+                (user_company and rfq.get("buyer_id") == user_company.get("unique_id")) or
+                rfq.get("buyer_id") == "SIMULATED_BUYER_123"
             )
-            
-            print(f"   ✅ Is Owner: {is_owner}")
+
+            # Also treat as owner if user accepted a bid on this RFQ
+            # (handles case where buyer_id format doesn't match)
+            if not is_owner:
+                accepted_bid = await db["bids"].find_one({
+                    "rfq_id": rfq_id,
+                    "status": {"$in": ["ACCEPTED", "CONFIRMED"]}
+                })
+                if accepted_bid:
+                    # Check if current user is NOT the bidder (i.e. they are the acceptor/buyer)
+                    bidder_ids = {accepted_bid.get("supplier_id")}
+                    if user_company:
+                        bidder_ids.add(user_company.get("unique_id"))
+                        bidder_ids.add(user_company.get("id"))
+                    bidder_ids.discard(None)
+                    # If user is not the bidder, they must be the one who accepted = buyer
+                    user_all_ids = {user.get("id"), user.get("company_id")}
+                    if user_company:
+                        user_all_ids.add(user_company.get("id"))
+                        user_all_ids.add(user_company.get("unique_id"))
+                    user_all_ids.discard(None)
+                    if not (user_all_ids & bidder_ids):
+                        is_owner = True  # user is the acceptor = buyer
         
+        # Fetch all bids for this RFQ
+        # Determine current user's company role and IDs for bid ownership checks
+        user_company_role = user_company.get("role", "").upper() if user_company else ""
+        user_company_ids = set()
+        if user:
+            user_company_ids.add(user.get("id"))
+            user_company_ids.add(user.get("company_id"))
+            if user_company:
+                user_company_ids.add(user_company.get("id"))
+                user_company_ids.add(user_company.get("unique_id"))
+        user_company_ids.discard(None)
+
+        bids = []
+        async for bid in db["bids"].find({"rfq_id": rfq_id}).sort("bid_price", 1):
+            bid["_id"] = str(bid["_id"])
+            
+            # First, clean up any old PENDING payments for this bid (older than 30 minutes)
+            from datetime import timedelta
+            thirty_minutes_ago = datetime.utcnow() - timedelta(minutes=30)
+            await db["payments"].delete_many({
+                "order_id": rfq_id,
+                "bid_id": bid.get("id"),
+                "status": EscrowStatusEnum.PENDING,
+                "created_at": {"$lt": thirty_minutes_ago}
+            })
+            
+            # Check if THIS specific bid has been paid (only PAID_IN_ESCROW or RELEASED)
+            existing_payment = await db["payments"].find_one({
+                "order_id": rfq_id,
+                "bid_id": bid.get("id"),
+                "status": {"$in": ["PAID_IN_ESCROW", "RELEASED"]}
+            })
+            bid["already_paid"] = existing_payment is not None
+            
+            # Check if contract exists for this bid
+            contract = await db["contracts"].find_one({
+                "rfq_id": rfq_id,
+                "bid_id": bid.get("id")
+            })
+            if contract:
+                bid["contract_id"] = contract.get("contract_id")
+                bid["contract_status"] = contract.get("status")
+            else:
+                bid["contract_id"] = None
+                bid["contract_status"] = None
+            
+            # Flag if this bid was placed by the current user (so they can't accept their own)
+            bid["is_own_bid"] = bid.get("supplier_id") in user_company_ids
+            bids.append(bid)
+
         return templates.TemplateResponse("rfq_detail.html", {
             "request": request,
             "user": user,
             "rfq": rfq,
-            "is_owner": is_owner
+            "is_owner": is_owner,
+            "bids": bids,
+            "user_company_role": user_company_role,
+            "is_buyer_role": user_company_role == "BUYER",
         })
     
     except HTTPException:
@@ -3108,3 +3569,1358 @@ async def update_rfq(rfq_id: str, request: Request, user: dict = Depends(require
         import traceback
         traceback.print_exc()
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+# ----------------------------------------
+# MULTI-CURRENCY ESCROW PAYMENT SYSTEM
+# ----------------------------------------
+import httpx
+from pydantic import BaseModel
+import uuid
+
+# In-memory cache for exchange rates
+exchange_rates_cache = {}
+CACHE_TTL_HOURS = 1
+
+async def get_exchange_rates():
+    now = datetime.utcnow()
+    if "USD" in exchange_rates_cache:
+        cached_data = exchange_rates_cache["USD"]
+        if now - cached_data["timestamp"] < timedelta(hours=CACHE_TTL_HOURS):
+            return cached_data["rates"]
+
+    try:
+        async with httpx.AsyncClient() as client:
+            # Using Open Exchange Rates API
+            response = await client.get("https://open.er-api.com/v6/latest/USD")
+            if response.status_code == 200:
+                data = response.json()
+                rates = data.get("rates", {})
+                exchange_rates_cache["USD"] = {
+                    "rates": rates,
+                    "timestamp": now
+                }
+                return rates
+    except Exception as e:
+        print(f"Error fetching exchange rates: {e}")
+    
+    # Fallback rates if API fails
+    return {"USD": 1.0, "BDT": 110.0, "EUR": 0.92, "GBP": 0.79}
+
+async def convert_to_base(amount: float, from_currency: str):
+    """Convert any supported currency to base USD."""
+    rates = await get_exchange_rates()
+    rate = rates.get(from_currency, 1.0)
+    # Conversion: USD = amount / rate_of_currency_per_usd
+    base_usd = amount / rate if rate else amount
+    return {
+        "original_amount": amount,
+        "original_currency": from_currency,
+        "base_amount_usd": base_usd,
+        "exchange_rate": rate
+    }
+
+@app.get("/api/currency/convert")
+async def api_convert_currency(amount: float, currency: str):
+    conversion = await convert_to_base(amount, currency)
+    return conversion
+
+
+class BidSubmitRequest(BaseModel):
+    rfq_id: str
+    bid_price: float
+
+
+@app.post("/api/bid/submit")
+async def submit_bid(payload: BidSubmitRequest, user: dict = Depends(require_login)):
+    """Any logged-in user can place a bid on an RFQ (reverse bidding system)."""
+    from database import db
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not available")
+
+    company = await db["companies"].find_one({"id": user.get("company_id")})
+    rfq = await db["rfqs"].find_one({"id": payload.rfq_id})
+    if not rfq:
+        raise HTTPException(status_code=404, detail="RFQ not found")
+
+    # Prevent bidding on your own RFQ
+    buyer_ids = {rfq.get("buyer_id"), user.get("id"), user.get("company_id")}
+    if company:
+        buyer_ids.add(company.get("id"))
+        buyer_ids.add(company.get("unique_id"))
+    buyer_ids.discard(None)
+    if rfq.get("buyer_id") in buyer_ids and rfq.get("buyer_id") == (company.get("id") if company else user.get("id")):
+        raise HTTPException(status_code=403, detail="You cannot bid on your own RFQ")
+
+    bidder_name = company.get("name", user.get("email", "Unknown")) if company else user.get("email", "Unknown")
+    bidder_id = company.get("unique_id") or company.get("id") if company else user.get("id")
+    bidder_role = company.get("role", "SUPPLIER").upper() if company else "SUPPLIER"
+
+    bid = BidModel(
+        rfq_id=payload.rfq_id,
+        supplier_id=bidder_id,
+        supplier_name=bidder_name,
+        bid_price=payload.bid_price,
+    )
+    bid_dict = bid.model_dump()
+    bid_dict["bidder_role"] = bidder_role  # track who placed the bid
+    await db["bids"].insert_one(bid_dict)
+
+    return {"success": True, "bid_id": bid.id, "message": "Bid submitted successfully"}
+
+
+class BidAcceptRequest(BaseModel):
+    bid_id: str
+    rfq_id: str
+
+
+@app.post("/api/bid/accept")
+async def accept_bid(payload: BidAcceptRequest, user: dict = Depends(require_login)):
+    """Accept a bid. Works for both buyer accepting supplier bid and supplier accepting buyer bid."""
+    from database import db
+    import uuid as _uuid
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not available")
+
+    rfq = await db["rfqs"].find_one({"id": payload.rfq_id})
+    if not rfq:
+        raise HTTPException(status_code=404, detail="RFQ not found")
+
+    bid = await db["bids"].find_one({"id": payload.bid_id, "rfq_id": payload.rfq_id})
+    if not bid:
+        raise HTTPException(status_code=404, detail="Bid not found")
+
+    # Get current user's company IDs
+    user_company = await db["companies"].find_one({"id": user.get("company_id")})
+    user_ids = {user.get("id"), user.get("company_id")}
+    if user_company:
+        user_ids.add(user_company.get("id"))
+        user_ids.add(user_company.get("unique_id"))
+    user_ids.discard(None)
+
+    # Cannot accept your own bid
+    if bid.get("supplier_id") in user_ids:
+        raise HTTPException(status_code=403, detail="You cannot accept your own bid")
+
+    # Mark this bid ACCEPTED, reject all others on this RFQ
+    await db["bids"].update_one({"id": payload.bid_id}, {"$set": {"status": "ACCEPTED"}})
+    await db["bids"].update_many(
+        {"rfq_id": payload.rfq_id, "id": {"$ne": payload.bid_id}},
+        {"$set": {"status": "REJECTED"}}
+    )
+
+    # Update RFQ to EVALUATING
+    await db["rfqs"].update_one({"id": payload.rfq_id}, {"$set": {"status": "EVALUATING"}})
+
+    # Notify the bid owner (whoever placed the bid)
+    bid_owner_company = await db["companies"].find_one({
+        "$or": [{"unique_id": bid.get("supplier_id")}, {"id": bid.get("supplier_id")}]
+    })
+    if bid_owner_company:
+        bid_owner_user = await db["users"].find_one({"company_id": bid_owner_company.get("id")})
+        if bid_owner_user:
+            acceptor_name = user_company.get("name", user.get("email", "")) if user_company else user.get("email", "")
+            await db["notifications"].insert_one({
+                "id": str(_uuid.uuid4()),
+                "user_id": bid_owner_user.get("id"),
+                "type": "bid_submitted",
+                "title": "Your Bid Was Accepted!",
+                "message": f"{acceptor_name} accepted your bid of BDT {bid.get('bid_price'):,.2f}/unit for '{rfq.get('title')}'. Please confirm you can fulfill this order.",
+                "is_read": False,
+                "created_at": datetime.utcnow(),
+                "related_id": payload.rfq_id,
+            })
+
+    return {"success": True, "message": "Bid accepted. The other party must now confirm."}
+
+
+class BidConfirmRequest(BaseModel):
+    bid_id: str
+    rfq_id: str
+
+
+@app.post("/api/bid/confirm")
+async def confirm_bid(payload: BidConfirmRequest, user: dict = Depends(require_login)):
+    """Supplier confirms they can fulfill the accepted bid. Unlocks Pay Now for the buyer."""
+    from database import db
+    import uuid as _uuid
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not available")
+
+    bid = await db["bids"].find_one({"id": payload.bid_id, "rfq_id": payload.rfq_id})
+    if not bid:
+        raise HTTPException(status_code=404, detail="Bid not found")
+
+    if bid.get("status") != "ACCEPTED":
+        raise HTTPException(status_code=400, detail="Bid must be ACCEPTED by buyer before supplier can confirm")
+
+    # Verify caller is the supplier of this bid
+    company = await db["companies"].find_one({"id": user.get("company_id")})
+    supplier_ids = [user.get("id")]
+    if company:
+        if company.get("unique_id"):
+            supplier_ids.append(company.get("unique_id"))
+        supplier_ids.append(company.get("id"))
+
+    if bid.get("supplier_id") not in supplier_ids:
+        raise HTTPException(status_code=403, detail="Only the supplier of this bid can confirm it")
+
+    # Mark bid as CONFIRMED
+    await db["bids"].update_one(
+        {"id": payload.bid_id},
+        {"$set": {"status": "CONFIRMED", "confirmed_at": datetime.utcnow()}}
+    )
+
+    # Notify the buyer
+    rfq = await db["rfqs"].find_one({"id": payload.rfq_id})
+    buyer_user = None
+    if rfq:
+        buyer_user = await db["users"].find_one({"id": rfq.get("buyer_id")})
+        if not buyer_user:
+            # Try by company_id
+            buyer_company = await db["companies"].find_one({
+                "$or": [
+                    {"id": rfq.get("buyer_id")},
+                    {"unique_id": rfq.get("buyer_id")},
+                ]
+            })
+            if buyer_company:
+                buyer_user = await db["users"].find_one({"company_id": buyer_company.get("id")})
+
+    if buyer_user:
+        await db["notifications"].insert_one({
+            "id": str(_uuid.uuid4()),
+            "user_id": buyer_user.get("id"),
+            "type": "bid_submitted",
+            "title": "Supplier Confirmed — Ready to Pay",
+            "message": f"The supplier has confirmed your accepted bid for '{rfq.get('title') if rfq else ''}'. You can now proceed to payment.",
+            "is_read": False,
+            "created_at": datetime.utcnow(),
+            "related_id": payload.rfq_id,
+        })
+
+    return {"success": True, "message": "Order confirmed. Buyer can now proceed to payment."}
+
+class InitiatePaymentRequest(BaseModel):
+    order_id: str
+    bid_id: str
+    amount: float
+    currency: str
+    supplier_id: str
+
+@app.post("/api/payment/initiate")
+async def initiate_payment(payload: InitiatePaymentRequest, user: dict = Depends(require_login)):
+    from database import db
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not available")
+    
+    # Clean up any existing PENDING payments for this bid (user might have cancelled before)
+    await db["payments"].delete_many({
+        "order_id": payload.order_id,
+        "bid_id": payload.bid_id,
+        "status": EscrowStatusEnum.PENDING
+    })
+        
+    buyer_id = user.get("id")
+    conversion = await convert_to_base(payload.amount, payload.currency)
+    
+    # Normally, integrate with SSLCommerz here for gateway initiation.
+    # We will simulate a successful SSLCommerz redirect logic.
+    payment_id = str(uuid.uuid4())
+    transaction_id = f"TXN-{secrets.token_hex(8).upper()}"
+    
+    payment = PaymentModel(
+        payment_id=payment_id,
+        transaction_id=transaction_id,
+        order_id=payload.order_id,
+        bid_id=payload.bid_id,
+        buyer_id=buyer_id,
+        supplier_id=payload.supplier_id,
+        amount=payload.amount,
+        original_amount=conversion["original_amount"],
+        original_currency=conversion["original_currency"],
+        base_amount_usd=conversion["base_amount_usd"],
+        exchange_rate=conversion["exchange_rate"],
+        status=EscrowStatusEnum.PENDING
+    )
+    
+    await db["payments"].insert_one(payment.model_dump())
+    
+    # Provide a redirect URL to our simulated SSLCommerz gateway
+    redirect_url = f"/payment/sslcommerz/checkout?txn={transaction_id}"
+    return {"success": True, "transaction_id": transaction_id, "redirect_url": redirect_url}
+
+@app.get("/payment/gateway", response_class=HTMLResponse)
+async def payment_gateway_page(
+    request: Request,
+    rfq_id: str,
+    bid_id: str,
+    user: dict = Depends(require_login)
+):
+    """Payment gateway page: shows currency conversion and 'Pay by Card' button."""
+    from database import db
+    rfq = await db["rfqs"].find_one({"id": rfq_id}) if db is not None else None
+    bid = await db["bids"].find_one({"id": bid_id}) if db is not None else None
+
+    if not rfq or not bid:
+        raise HTTPException(status_code=404, detail="RFQ or Bid not found")
+
+    # Pre-fetch conversion for BDT so the page can render the preview
+    bid_price = bid.get("bid_price", 0)
+    quantity = rfq.get("quantity", 1)
+    total_bdt = bid_price * quantity
+    conversion = await convert_to_base(total_bdt, "BDT")
+
+    return templates.TemplateResponse("payment_gateway.html", {
+        "request": request,
+        "user": user,
+        "rfq": rfq,
+        "bid": bid,
+        "total_local": total_bdt,
+        "local_currency": "BDT",
+        "usd_amount": round(conversion["base_amount_usd"], 2),
+        "exchange_rate": round(conversion["exchange_rate"], 4),
+    })
+
+
+@app.get("/payment/sslcommerz/checkout", response_class=HTMLResponse)
+async def sslcommerz_mock_checkout(request: Request, txn: str):
+    """Simulated SSLCommerz Hosted Checkout page (Strictly Card Only)."""
+    from database import db
+    payment = None
+    if db is not None:
+        payment = await db["payments"].find_one({"transaction_id": txn})
+    return templates.TemplateResponse("mock_sslcommerz.html", {
+        "request": request,
+        "txn": txn,
+        "payment": payment,
+    })
+
+
+@app.post("/api/payment/success")
+async def payment_success(request: Request, transaction_id: str = Form(...)):
+    """
+    SSLCommerz IPN / redirect callback.
+    Marks the payment as HELD_IN_ESCROW and logs the exact exchange rate
+    that was captured at initiation time (already stored in the document).
+    Also marks the linked RFQ as AWARDED so it leaves the open feed.
+    """
+    from database import db
+    if db is not None:
+        payment = await db["payments"].find_one({"transaction_id": transaction_id})
+        if payment:
+            confirmed_at = datetime.utcnow()
+            print(
+                f"[ESCROW] Payment confirmed | txn={transaction_id} | "
+                f"local={payment.get('original_amount')} {payment.get('original_currency')} | "
+                f"usd={payment.get('base_amount_usd')} | "
+                f"rate_at_payment={payment.get('exchange_rate')} | "
+                f"confirmed_at={confirmed_at.isoformat()}"
+            )
+            await db["payments"].update_one(
+                {"transaction_id": transaction_id},
+                {
+                    "$set": {
+                        "status": EscrowStatusEnum.PAID_IN_ESCROW,
+                        "updated_at": confirmed_at,
+                        "confirmed_at": confirmed_at,
+                        "rate_locked_at_payment": payment.get("exchange_rate"),
+                    }
+                }
+            )
+            # Mark the linked RFQ as AWARDED so it no longer appears in the open feed
+            order_id = payment.get("order_id")
+            if order_id:
+                result = await db["rfqs"].update_one(
+                    {"id": order_id},
+                    {"$set": {"status": "AWARDED"}}
+                )
+                print(f"[ESCROW] RFQ {order_id} status → AWARDED (matched={result.matched_count}, modified={result.modified_count})")
+    return RedirectResponse(url="/buyer/orders", status_code=303)
+
+
+@app.post("/api/payment/fail")
+async def payment_fail(request: Request, transaction_id: str = Form(...)):
+    """SSLCommerz failure callback — deletes the pending payment."""
+    from database import db
+    if db is not None:
+        # Delete the failed payment record
+        await db["payments"].delete_one({
+            "transaction_id": transaction_id,
+            "status": EscrowStatusEnum.PENDING
+        })
+    return RedirectResponse(url=f"/buyer/orders?failed={transaction_id}", status_code=303)
+
+
+@app.post("/api/payment/cancel")
+async def payment_cancel(request: Request, transaction_id: str = Form(...)):
+    """SSLCommerz cancel callback - deletes the pending payment."""
+    from database import db
+    if db is not None:
+        # Delete the pending payment record
+        await db["payments"].delete_one({
+            "transaction_id": transaction_id,
+            "status": EscrowStatusEnum.PENDING
+        })
+    return RedirectResponse(url=f"/buyer/orders?cancelled={transaction_id}", status_code=303)
+
+
+class ReleasePaymentRequest(BaseModel):
+    payment_id: str
+
+
+@app.post("/api/payment/release")
+async def release_escrow(payload: ReleasePaymentRequest, user: dict = Depends(require_login)):
+    """Admin or buyer releases escrowed funds to the supplier."""
+    from database import db
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not available")
+
+    payment = await db["payments"].find_one({"payment_id": payload.payment_id})
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+
+    if not user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Only admins can release escrow funds")
+
+    if payment.get("status") not in [EscrowStatusEnum.PAID_IN_ESCROW, "WORK_IN_PROGRESS", "SENT_FOR_DELIVERY"]:
+        raise HTTPException(status_code=400, detail="Payment must be in escrow to release")
+
+    await db["payments"].update_one(
+        {"payment_id": payload.payment_id},
+        {"$set": {"status": EscrowStatusEnum.RELEASED, "updated_at": datetime.utcnow()}}
+    )
+    return {"success": True, "message": "Funds released to supplier"}
+
+
+class DisputePaymentRequest(BaseModel):
+    payment_id: str
+    reason: str
+
+
+@app.post("/api/payment/dispute")
+async def dispute_escrow(payload: DisputePaymentRequest, user: dict = Depends(require_login)):
+    """Admin places a payment on hold (DISPUTED) to block release."""
+    from database import db
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not available")
+
+    if not user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Only admins can file disputes")
+
+    payment = await db["payments"].find_one({"payment_id": payload.payment_id})
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+
+    if payment.get("status") not in [EscrowStatusEnum.PAID_IN_ESCROW, EscrowStatusEnum.RELEASED]:
+        raise HTTPException(status_code=400, detail="Cannot dispute a payment in its current state")
+
+    await db["payments"].update_one(
+        {"payment_id": payload.payment_id},
+        {
+            "$set": {
+                "status": EscrowStatusEnum.DISPUTED,
+                "dispute_reason": payload.reason,
+                "updated_at": datetime.utcnow(),
+            }
+        }
+    )
+    return {"success": True, "message": "Payment marked as DISPUTED"}
+
+
+class SupplierOrderActionRequest(BaseModel):
+    payment_id: str
+
+
+@app.post("/api/order/start-work")
+async def supplier_start_work(payload: SupplierOrderActionRequest, user: dict = Depends(require_login)):
+    """Supplier marks order as Work In Progress."""
+    from database import db
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not available")
+
+    payment = await db["payments"].find_one({"payment_id": payload.payment_id})
+    if not payment:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    if payment.get("status") != "PAID_IN_ESCROW":
+        raise HTTPException(status_code=400, detail="Order must be in escrow to start work")
+
+    await db["payments"].update_one(
+        {"payment_id": payload.payment_id},
+        {"$set": {"status": "WORK_IN_PROGRESS", "updated_at": datetime.utcnow(), "work_started_at": datetime.utcnow()}}
+    )
+    return {"success": True, "message": "Order marked as Work In Progress"}
+
+
+@app.post("/api/order/send-delivery")
+async def supplier_send_delivery(payload: SupplierOrderActionRequest, user: dict = Depends(require_login)):
+    """Supplier marks order as Sent for Delivery — triggers admin to release escrow."""
+    from database import db
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not available")
+
+    payment = await db["payments"].find_one({"payment_id": payload.payment_id})
+    if not payment:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    if payment.get("status") not in ["PAID_IN_ESCROW", "WORK_IN_PROGRESS"]:
+        raise HTTPException(status_code=400, detail="Cannot mark delivery in current state")
+
+    await db["payments"].update_one(
+        {"payment_id": payload.payment_id},
+        {"$set": {"status": "SENT_FOR_DELIVERY", "updated_at": datetime.utcnow(), "delivered_at": datetime.utcnow()}}
+    )
+    return {"success": True, "message": "Order marked as Sent for Delivery. Admin will release funds."}
+
+
+@app.get("/api/payment/list")
+async def list_payments(user: dict = Depends(require_login)):
+    """List payments — admins see all, buyers see their own."""
+    from database import db
+    if db is None:
+        return {"payments": []}
+
+    query = {} if user.get("is_admin") else {"buyer_id": user.get("id")}
+    payments = []
+    async for payment in db["payments"].find(query).sort("created_at", -1):
+        payment["_id"] = str(payment["_id"])
+        # Serialize datetimes
+        for key in ("created_at", "updated_at", "confirmed_at"):
+            if isinstance(payment.get(key), datetime):
+                payment[key] = payment[key].isoformat() + "Z"
+        payments.append(payment)
+    return {"payments": payments}
+
+
+@app.get("/escrow/tracker/{payment_id}", response_class=HTMLResponse)
+async def escrow_tracker_page(request: Request, payment_id: str, user: dict = Depends(require_login)):
+    """Visual escrow progress tracker for a specific payment."""
+    from database import db
+    payment = None
+    rfq = None
+    if db is not None:
+        payment = await db["payments"].find_one({"payment_id": payment_id})
+        if payment:
+            rfq = await db["rfqs"].find_one({"id": payment.get("order_id")})
+
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+
+    # Only the buyer, supplier, or admin can view the tracker
+    # supplier_id in payment may be company unique_id or company id — check all
+    is_buyer = payment.get("buyer_id") == user.get("id")
+    is_supplier = payment.get("supplier_id") == user.get("id")
+    if not is_supplier and db is not None:
+        company = await db["companies"].find_one({"id": user.get("company_id")})
+        if company:
+            is_supplier = (
+                payment.get("supplier_id") == company.get("unique_id") or
+                payment.get("supplier_id") == company.get("id")
+            )
+    if not (is_buyer or is_supplier or user.get("is_admin")):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    return templates.TemplateResponse("escrow_tracker.html", {
+        "request": request,
+        "user": user,
+        "payment": payment,
+        "rfq": rfq,
+        "is_buyer": is_buyer,
+        "is_supplier": is_supplier,
+    })
+
+
+# New frontend routes for dashboards
+@app.get("/buyer/checkout/{rfq_id}/{bid_id}", response_class=HTMLResponse)
+async def buyer_checkout_page(request: Request, rfq_id: str, bid_id: str, user: dict = Depends(require_login)):
+    """Redirect to the new payment gateway page."""
+    return RedirectResponse(url=f"/payment/gateway?rfq_id={rfq_id}&bid_id={bid_id}", status_code=303)
+
+
+@app.get("/buyer/orders", response_class=HTMLResponse)
+async def buyer_orders_page(request: Request, user: dict = Depends(require_login)):
+    from database import db
+    orders = []
+    if db is not None:
+        async for order in db["payments"].find({"buyer_id": user.get("id")}).sort("created_at", -1):
+            order["_id"] = str(order["_id"])
+            orders.append(order)
+    return templates.TemplateResponse("buyer_orders.html", {"request": request, "user": user, "orders": orders})
+
+
+@app.get("/admin/escrow", response_class=HTMLResponse)
+async def admin_escrow_page(request: Request, admin: dict = Depends(require_admin)):
+    return templates.TemplateResponse("admin_escrow.html", {"request": request, "user": admin})
+
+
+# ----------------------------------------
+# SHIPPING & INCOTERMS CALCULATOR ROUTES
+# ----------------------------------------
+
+@app.get("/api/shipping/ports")
+async def get_ports():
+    """Return all seeded ports for the shipping calculator dropdowns."""
+    from database import db
+    if db is None:
+        return JSONResponse({"success": False, "error": "Database not available"}, status_code=500)
+    
+    ports = await db["ports"].find({}).sort("name", 1).to_list(length=500)
+    for p in ports:
+        p.pop("_id", None)
+    return {"success": True, "ports": ports}
+
+
+@app.get("/api/shipping/incoterms")
+async def get_incoterms():
+    """Return all supported Incoterms with descriptions and responsibility breakdowns."""
+    result = []
+    for code, data in INCOTERMS_DATA.items():
+        result.append({
+            "code": code,
+            "name": data["name"],
+            "description": data["description"],
+            "seller_pays": data["seller_pays"],
+            "buyer_pays": data["buyer_pays"],
+        })
+    return {"success": True, "incoterms": result}
+
+
+@app.get("/api/shipping/rfq/{rfq_id}")
+async def calculate_shipping_for_rfq(
+    rfq_id: str,
+    origin_port_code: str,
+    user: dict = Depends(require_login)
+):
+    """
+    Calculate shipping for a specific RFQ using its locked parameters.
+    Only the origin port (supplier's loading port) is variable.
+    Everything else — incoterm, shipping method, destination, quantity — is fixed from the RFQ.
+    """
+    from database import db
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not available")
+
+    rfq = await db["rfqs"].find_one({"id": rfq_id})
+    if not rfq:
+        raise HTTPException(status_code=404, detail="RFQ not found")
+
+    # Map RFQ shipping method to calculator enum
+    raw_method = (rfq.get("shipping_method") or "Sea").upper()
+    method_map = {
+        "SEA": "SEA", "SEA FREIGHT": "SEA", "OCEAN": "SEA",
+        "AIR": "AIR", "AIR FREIGHT": "AIR",
+        "LAND": "ROAD", "LAND/RAIL": "ROAD", "ROAD": "ROAD", "RAIL": "ROAD",
+    }
+    shipping_method = method_map.get(raw_method, "SEA")
+
+    # Map incoterm
+    incoterm_raw = (rfq.get("incoterm") or rfq.get("incoterms") or "FOB").upper()
+    incoterm_map = {"FOB": "FOB", "CIF": "CIF", "CFR": "CFR", "EXW": "EXW", "DAP": "DAP", "DDP": "DDP"}
+    incoterm = incoterm_map.get(incoterm_raw, "FOB")
+
+    # Build a ShippingCalculateRequest using RFQ locked params
+    try:
+        payload = ShippingCalculateRequest(
+            rfq_id=rfq_id,
+            origin_port_code=origin_port_code.upper(),
+            dest_port_code=rfq.get("destination_port", "NLRTM"),
+            shipping_method=ShippingMethodEnum(shipping_method),
+            incoterm=IncotermEnum(incoterm),
+            quantity=rfq.get("quantity", 1),
+            goods_value_usd=0.0,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Invalid parameters: {e}")
+
+    # Reuse the main calculate function logic inline
+    cfg = await db["shipping_config"].find_one({"_id": "global"}) or {}
+    insurance_rate   = float(cfg.get("insurance_rate", 0.003))
+    import_duty_rate = float(cfg.get("import_duty_rate", 0.12))
+    port_fees = {"SEA": float(cfg.get("port_fee_sea", 320.0)), "AIR": float(cfg.get("port_fee_air", 180.0)), "ROAD": float(cfg.get("port_fee_road", 90.0))}
+    routing_factors = {"SEA": float(cfg.get("routing_factor_sea", 1.2)), "AIR": float(cfg.get("routing_factor_air", 1.05)), "ROAD": float(cfg.get("routing_factor_road", 1.3))}
+    speeds = {"SEA": float(cfg.get("speed_sea_kmh", 37.0)), "AIR": float(cfg.get("speed_air_kmh", 800.0)), "ROAD": float(cfg.get("speed_road_kmh", 60.0))}
+    handling_days = {"SEA": float(cfg.get("handling_days_sea", 4.0)), "AIR": float(cfg.get("handling_days_air", 1.5)), "ROAD": float(cfg.get("handling_days_road", 2.0))}
+    min_freight = {"SEA": float(cfg.get("min_freight_sea", 150.0)), "AIR": float(cfg.get("min_freight_air", 80.0)), "ROAD": float(cfg.get("min_freight_road", 50.0))}
+    max_freight = {"SEA": float(cfg.get("max_freight_sea", 50000.0)), "AIR": float(cfg.get("max_freight_air", 30000.0)), "ROAD": float(cfg.get("max_freight_road", 20000.0))}
+
+    origin = await db["ports"].find_one({"code": payload.origin_port_code})
+    if not origin:
+        # Try name match
+        origin = await db["ports"].find_one({"name": {"$regex": payload.origin_port_code, "$options": "i"}})
+    if not origin:
+        raise HTTPException(status_code=404, detail=f"Origin port '{payload.origin_port_code}' not found. Please select from the dropdown.")
+
+    dest_code = payload.dest_port_code.upper()
+    dest = await db["ports"].find_one({"code": dest_code})
+    if not dest:
+        # Try name match for destination
+        dest_name = rfq.get("destination_port", "")
+        dest = await db["ports"].find_one({"name": {"$regex": dest_name[:6], "$options": "i"}}) if dest_name else None
+    if not dest:
+        raise HTTPException(status_code=404, detail=f"Destination port '{payload.dest_port_code}' not found in port database.")
+
+    incoterm_info = INCOTERMS_DATA.get(incoterm)
+    if not incoterm_info:
+        raise HTTPException(status_code=422, detail=f"Unsupported Incoterm: {incoterm}")
+
+    origin_region = origin["region"]
+    dest_region   = dest["region"]
+    method        = shipping_method
+
+    rate_doc = await db["shipping_rates"].find_one({"origin_region": origin_region, "dest_region": dest_region, "method": method})
+    base_rate_per_kg = float(rate_doc["base_rate_per_kg"]) if rate_doc else next(
+        (float(r["base_rate_per_kg"]) for r in DEFAULT_RATES if r["origin_region"] == origin_region and r["method"] == method), 2.0
+    )
+
+    weight_kg = payload.quantity * 0.3
+    distance_factor = float(dest.get("distance_factor", 1.0))
+    effective_factor = distance_factor * routing_factors.get(method, 1.0)
+    raw_freight = base_rate_per_kg * weight_kg * effective_factor
+    base_freight = max(min_freight.get(method, 0), min(max_freight.get(method, 999999), raw_freight))
+    insurance_cost = base_freight * insurance_rate
+    port_fee = port_fees.get(method, 320.0)
+    duties_cost = 0.0
+
+    if incoterm == "EXW":
+        total_seller = 0.0; total_buyer = base_freight + insurance_cost + port_fee + duties_cost
+    elif incoterm == "FOB":
+        total_seller = base_freight * 0.15 + port_fee; total_buyer = base_freight * 0.85 + insurance_cost + duties_cost
+    elif incoterm == "CFR":
+        total_seller = base_freight + port_fee; total_buyer = insurance_cost + duties_cost
+    elif incoterm == "CIF":
+        total_seller = base_freight + insurance_cost + port_fee; total_buyer = duties_cost
+    elif incoterm == "DAP":
+        total_seller = base_freight + insurance_cost + port_fee; total_buyer = duties_cost
+    elif incoterm == "DDP":
+        total_seller = base_freight + insurance_cost + port_fee + duties_cost; total_buyer = 0.0
+    else:
+        total_seller = base_freight + insurance_cost + port_fee; total_buyer = 0.0
+
+    grand_total = total_seller + total_buyer
+    approx_km = distance_factor * 2500
+    transit_time = (approx_km / speeds.get(method, 37.0)) / 24 + handling_days.get(method, 4.0)
+    estimated_days = max(1, math.ceil(transit_time))
+
+    return {
+        "success": True,
+        "rfq_id": rfq_id,
+        "rfq_title": rfq.get("title", ""),
+        "locked_params": {
+            "incoterm": incoterm,
+            "shipping_method": method,
+            "destination_port": rfq.get("destination_port", ""),
+            "quantity": payload.quantity,
+        },
+        "incoterm": incoterm,
+        "incoterm_name": incoterm_info["name"],
+        "incoterm_description": incoterm_info["description"],
+        "seller_pays": incoterm_info["seller_pays"],
+        "buyer_pays": incoterm_info["buyer_pays"],
+        "breakdown": {
+            "base_freight_usd": round(base_freight, 2),
+            "insurance_usd": round(insurance_cost, 2),
+            "handling_usd": round(port_fee, 2),
+            "duties_usd": round(duties_cost, 2),
+            "total_seller_usd": round(total_seller, 2),
+            "total_buyer_usd": round(total_buyer, 2),
+            "grand_total_usd": round(grand_total, 2),
+        },
+        "origin_port": f"{origin['name']}, {origin['country']}",
+        "dest_port": f"{dest['name']}, {dest['country']}",
+        "shipping_method": method,
+        "weight_kg": round(weight_kg, 1),
+        "estimated_days": estimated_days,
+    }
+
+
+@app.post("/api/shipping/calculate")
+async def calculate_shipping(
+    payload: ShippingCalculateRequest,
+    user: dict = Depends(require_login)
+):
+    """Calculate estimated shipping cost using admin-managed config from DB."""
+    from database import db
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not available")
+
+    # Load global config (admin-managed)
+    cfg = await db["shipping_config"].find_one({"_id": "global"}) or {}
+
+    # Config values with fallbacks to defaults
+    insurance_rate      = float(cfg.get("insurance_rate", 0.003))
+    import_duty_rate    = float(cfg.get("import_duty_rate", 0.12))
+
+    port_fees = {
+        "SEA":  float(cfg.get("port_fee_sea", 320.0)),
+        "AIR":  float(cfg.get("port_fee_air", 180.0)),
+        "ROAD": float(cfg.get("port_fee_road", 90.0)),
+    }
+    routing_factors = {
+        "SEA":  float(cfg.get("routing_factor_sea", 1.2)),
+        "AIR":  float(cfg.get("routing_factor_air", 1.05)),
+        "ROAD": float(cfg.get("routing_factor_road", 1.3)),
+    }
+    speeds = {
+        "SEA":  float(cfg.get("speed_sea_kmh", 37.0)),
+        "AIR":  float(cfg.get("speed_air_kmh", 800.0)),
+        "ROAD": float(cfg.get("speed_road_kmh", 60.0)),
+    }
+    handling_days = {
+        "SEA":  float(cfg.get("handling_days_sea", 4.0)),
+        "AIR":  float(cfg.get("handling_days_air", 1.5)),
+        "ROAD": float(cfg.get("handling_days_road", 2.0)),
+    }
+    min_freight = {
+        "SEA":  float(cfg.get("min_freight_sea", 150.0)),
+        "AIR":  float(cfg.get("min_freight_air", 80.0)),
+        "ROAD": float(cfg.get("min_freight_road", 50.0)),
+    }
+    max_freight = {
+        "SEA":  float(cfg.get("max_freight_sea", 50000.0)),
+        "AIR":  float(cfg.get("max_freight_air", 30000.0)),
+        "ROAD": float(cfg.get("max_freight_road", 20000.0)),
+    }
+    air_zone_short_km   = float(cfg.get("air_zone_short_max_km", 3000.0))
+    air_zone_mid_km     = float(cfg.get("air_zone_mid_max_km", 8000.0))
+    air_short_mult      = float(cfg.get("air_zone_short_multiplier", 1.0))
+    air_mid_mult        = float(cfg.get("air_zone_mid_multiplier", 1.2))
+    air_long_mult       = float(cfg.get("air_zone_long_multiplier", 1.5))
+
+    # Look up ports
+    origin = await db["ports"].find_one({"code": payload.origin_port_code.upper()})
+    if not origin:
+        raise HTTPException(status_code=404, detail=f"Origin port '{payload.origin_port_code}' not found")
+    dest = await db["ports"].find_one({"code": payload.dest_port_code.upper()})
+    if not dest:
+        raise HTTPException(status_code=404, detail=f"Destination port '{payload.dest_port_code}' not found")
+
+    incoterm_code = payload.incoterm.value
+    incoterm_info = INCOTERMS_DATA.get(incoterm_code)
+    if not incoterm_info:
+        raise HTTPException(status_code=422, detail=f"Unsupported Incoterm: {incoterm_code}")
+
+    origin_region = origin["region"]
+    dest_region   = dest["region"]
+    method        = payload.shipping_method.value
+
+    # Look up base rate from DB
+    rate_doc = await db["shipping_rates"].find_one({
+        "origin_region": origin_region,
+        "dest_region": dest_region,
+        "method": method,
+    })
+    if rate_doc:
+        base_rate_per_kg = float(rate_doc["base_rate_per_kg"])
+    else:
+        fallback = next(
+            (r for r in DEFAULT_RATES if r["origin_region"] == origin_region and r["method"] == method),
+            None
+        )
+        base_rate_per_kg = float(fallback["base_rate_per_kg"]) if fallback else 2.0
+
+    # Weight estimation (avg garment = 0.3 kg)
+    weight_kg = payload.quantity * 0.3
+
+    # Distance factor from port document
+    distance_factor = float(dest.get("distance_factor", 1.0))
+
+    # Apply routing factor (admin-configurable)
+    effective_factor = distance_factor * routing_factors.get(method, 1.0)
+
+    # Air freight zone multiplier based on distance factor proxy
+    air_zone_mult = 1.0
+    if method == "AIR":
+        # Use distance_factor as a proxy for distance (1.0=short, 2.5=mid, 3.5+=long)
+        approx_km = distance_factor * 2500  # rough km estimate
+        if approx_km <= air_zone_short_km:
+            air_zone_mult = air_short_mult
+        elif approx_km <= air_zone_mid_km:
+            air_zone_mult = air_mid_mult
+        else:
+            air_zone_mult = air_long_mult
+        effective_factor *= air_zone_mult
+
+    # Base freight calculation
+    raw_freight = base_rate_per_kg * weight_kg * effective_factor
+
+    # Apply min/max thresholds (admin-configurable)
+    base_freight = max(min_freight.get(method, 0), min(max_freight.get(method, 999999), raw_freight))
+
+    # Insurance and port fees from config
+    insurance_cost = base_freight * insurance_rate
+    port_fee       = port_fees.get(method, 320.0)
+
+    # Duties estimate (only for DDP)
+    goods_value  = payload.goods_value_usd or 0.0
+    duties_cost  = 0.0
+    if incoterm_info["includes_duties"] and goods_value > 0:
+        duties_cost = goods_value * import_duty_rate
+
+    # Incoterm cost split
+    if incoterm_code == "EXW":
+        total_seller = 0.0
+        total_buyer  = base_freight + insurance_cost + port_fee + duties_cost
+    elif incoterm_code == "FOB":
+        total_seller = base_freight * 0.15 + port_fee
+        total_buyer  = base_freight * 0.85 + insurance_cost + duties_cost
+    elif incoterm_code == "CFR":
+        total_seller = base_freight + port_fee
+        total_buyer  = insurance_cost + duties_cost
+    elif incoterm_code == "CIF":
+        total_seller = base_freight + insurance_cost + port_fee
+        total_buyer  = duties_cost
+    elif incoterm_code == "DAP":
+        total_seller = base_freight + insurance_cost + port_fee
+        total_buyer  = duties_cost
+    elif incoterm_code == "DDP":
+        total_seller = base_freight + insurance_cost + port_fee + duties_cost
+        total_buyer  = 0.0
+    else:
+        total_seller = base_freight + insurance_cost + port_fee
+        total_buyer  = 0.0
+
+    grand_total = total_seller + total_buyer
+
+    # Transit time using admin-configurable speeds and handling days
+    speed        = speeds.get(method, 37.0)
+    h_days       = handling_days.get(method, 4.0)
+    approx_km    = distance_factor * 2500
+    transit_time = (approx_km / speed) / 24 + h_days  # hours → days
+    estimated_days = max(1, math.ceil(transit_time))
+
+    return {
+        "success": True,
+        "incoterm": incoterm_code,
+        "incoterm_name": incoterm_info["name"],
+        "incoterm_description": incoterm_info["description"],
+        "seller_pays": incoterm_info["seller_pays"],
+        "buyer_pays": incoterm_info["buyer_pays"],
+        "breakdown": {
+            "base_freight_usd": round(base_freight, 2),
+            "insurance_usd": round(insurance_cost, 2),
+            "handling_usd": round(port_fee, 2),
+            "duties_usd": round(duties_cost, 2),
+            "total_seller_usd": round(total_seller, 2),
+            "total_buyer_usd": round(total_buyer, 2),
+            "grand_total_usd": round(grand_total, 2),
+        },
+        "origin_port": f"{origin['name']}, {origin['country']}",
+        "dest_port": f"{dest['name']}, {dest['country']}",
+        "shipping_method": method,
+        "weight_kg": round(weight_kg, 1),
+        "estimated_days": estimated_days,
+        # Expose config used so admin can verify
+        "config_used": {
+            "insurance_rate_pct": round(insurance_rate * 100, 2),
+            "port_fee_usd": round(port_fee, 2),
+            "routing_factor": routing_factors.get(method, 1.0),
+            "min_freight_usd": min_freight.get(method, 0),
+            "max_freight_usd": max_freight.get(method, 999999),
+        },
+    }
+
+
+
+
+
+
+# ----------------------------------------
+# CONTRACT GENERATOR ROUTES
+# ----------------------------------------
+import hashlib as _hashlib
+
+
+def _build_contract_text(c: dict) -> str:
+    """Build the plain-text contract body used for hashing and display."""
+    lines = [
+        f"CONTRACT AGREEMENT",
+        f"Contract No: {c['contract_id']}",
+        f"Date: {c['created_at']}",
+        "",
+        "1. PARTIES",
+        f"Buyer:    {c['buyer_legal_name']} ({c['buyer_email']})",
+        f"Supplier: {c['supplier_legal_name']} ({c['supplier_email']})",
+        "",
+        "2. ORDER DETAILS",
+        f"Product:     {c['rfq_title']} — {c['rfq_product_category']}",
+        f"Fabric:      {c['rfq_fabric_type']}",
+        f"Quantity:    {c['rfq_quantity']:,} units",
+        f"Unit Price:  BDT {c['bid_price']:,.2f}",
+        f"Total Value: BDT {c['bid_total_value']:,.2f}",
+        "",
+        "3. DELIVERY TERMS",
+        f"Incoterm:         {c['rfq_incoterm']}",
+        f"Shipping Method:  {c['rfq_shipping_method'] or 'TBD'}",
+        f"Destination Port: {c['rfq_destination_port'] or 'TBD'}",
+        "",
+        "4. SAMPLE REQUIREMENTS",
+        f"Proto Sample Required:      {'Yes' if c['rfq_proto_sample_req'] else 'No'}",
+        f"Pre-Production Sample Req:  {'Yes' if c['rfq_pp_sample_req'] else 'No'}",
+        "Sample Approval Process:    Digital approval/rejection via TexBid platform",
+        "",
+        "5. PAYMENT & ESCROW CONDITIONS",
+        "- Buyer deposits full order value into TexBid escrow before production begins.",
+        "- Funds are held by TexBid and released to supplier only after:",
+        "  a) Buyer confirms receipt of goods, OR",
+        "  b) Admin verifies delivery completion in case of dispute.",
+        "- Partial payment release is permitted at milestone completion.",
+        "",
+        "6. DISPUTE RESOLUTION",
+        "6.1 Refund Clause: If the supplier fails to deliver within the agreed deadline,",
+        "    the buyer is entitled to a full or partial refund from escrow.",
+        "6.2 Partial Payment Clause: If goods are partially delivered or defective,",
+        "    escrow is split proportionally based on evidence submitted by both parties.",
+        "6.3 Re-shipment Clause: If goods are rejected due to quality failure, the supplier",
+        "    must re-ship conforming goods at their own cost, or a refund is triggered.",
+        "6.4 Contract Enforcement Clause: Both parties agree this contract is legally binding.",
+        "    TexBid reserves the right to freeze escrow funds and escalate to legal enforcement.",
+        "",
+        "7. CONFIDENTIALITY",
+        "Both parties agree to keep pricing, product specifications, and communication",
+        "confidential and not disclose to third parties without written consent.",
+        "",
+        "8. FORCE MAJEURE",
+        "Neither party is liable for delays caused by events beyond reasonable control",
+        "including natural disasters, pandemics, port strikes, or government restrictions.",
+        "",
+        "9. SPECIAL INSTRUCTIONS",
+        c.get("rfq_special_instructions") or "None",
+        "",
+        "10. SIGNATURES",
+        f"Buyer Signature:    {'[SIGNED]' if c.get('buyer_signed_at') else '[PENDING]'}",
+        f"  Signed by: {c.get('buyer_legal_name', '')}",
+        f"  Date: {c.get('buyer_signed_at') or '___________'}",
+        "",
+        f"Supplier Signature: {'[SIGNED]' if c.get('supplier_signed_at') else '[PENDING]'}",
+        f"  Signed by: {c.get('supplier_legal_name', '')}",
+        f"  Date: {c.get('supplier_signed_at') or '___________'}",
+        "",
+        f"Platform Verified: TexBid  |  Contract ID: {c['contract_id']}",
+    ]
+    return "\n".join(lines)
+
+
+class GenerateContractRequest(BaseModel):
+    rfq_id: str
+    bid_id: str
+    payment_id: Optional[str] = None
+
+
+@app.post("/api/contracts/generate")
+async def generate_contract(payload: GenerateContractRequest, user: dict = Depends(require_login)):
+    """Generate a contract from an accepted bid. Only the buyer of the RFQ can generate."""
+    from database import db
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not available")
+
+    # Load RFQ
+    rfq = await db["rfqs"].find_one({"id": payload.rfq_id})
+    if not rfq:
+        raise HTTPException(status_code=404, detail="RFQ not found")
+
+    # Load bid
+    bid = await db["bids"].find_one({"id": payload.bid_id})
+    if not bid:
+        raise HTTPException(status_code=404, detail="Bid not found")
+
+    # Verify caller is the buyer
+    buyer_company = await db["companies"].find_one({"id": user.get("company_id")})
+    is_buyer = (
+        rfq.get("buyer_id") == user.get("id") or
+        rfq.get("buyer_id") == user.get("company_id") or
+        (buyer_company and rfq.get("buyer_id") == buyer_company.get("id")) or
+        (buyer_company and rfq.get("buyer_id") == buyer_company.get("unique_id"))
+    )
+    if not is_buyer:
+        raise HTTPException(status_code=403, detail="Only the buyer of this RFQ can generate a contract")
+
+    # Check if contract already exists for this bid
+    existing = await db["contracts"].find_one({"rfq_id": payload.rfq_id, "bid_id": payload.bid_id})
+    if existing:
+        existing.pop("_id", None)
+        return {"success": True, "contract_id": existing["contract_id"], "already_exists": True}
+
+    # Load supplier company
+    supplier_company = await db["companies"].find_one({
+        "$or": [
+            {"unique_id": bid.get("supplier_id")},
+            {"id": bid.get("supplier_id")},
+        ]
+    })
+    supplier_user = await db["users"].find_one({"company_id": supplier_company.get("id")}) if supplier_company else None
+
+    # Build contract document
+    quantity = rfq.get("quantity", 0)
+    bid_price = bid.get("bid_price", 0.0)
+    total_value = bid_price * quantity
+
+    contract_data = {
+        "rfq_id": payload.rfq_id,
+        "bid_id": payload.bid_id,
+        "payment_id": payload.payment_id,
+        "buyer_id": user.get("id"),
+        "supplier_id": bid.get("supplier_id"),
+        "rfq_title": rfq.get("title", "Untitled RFQ"),
+        "rfq_product_category": rfq.get("product_category", ""),
+        "rfq_quantity": quantity,
+        "rfq_incoterm": rfq.get("incoterm") or rfq.get("incoterms") or "FOB",
+        "rfq_shipping_method": rfq.get("shipping_method") or "",
+        "rfq_destination_port": rfq.get("destination_port") or "",
+        "rfq_proto_sample_req": rfq.get("proto_sample_req", False),
+        "rfq_pp_sample_req": rfq.get("pp_sample_req", False),
+        "rfq_fabric_type": rfq.get("fabric_type", ""),
+        "rfq_special_instructions": rfq.get("special_instructions") or "",
+        "bid_price": bid_price,
+        "bid_total_value": total_value,
+        "bid_supplier_name": bid.get("supplier_name", ""),
+        "buyer_legal_name": buyer_company.get("name", user.get("email", "")) if buyer_company else user.get("email", ""),
+        "buyer_email": user.get("email", ""),
+        "supplier_legal_name": supplier_company.get("name", bid.get("supplier_name", "")) if supplier_company else bid.get("supplier_name", ""),
+        "supplier_email": supplier_user.get("email", "") if supplier_user else "",
+        "buyer_signed_at": None,
+        "buyer_signed_by": None,
+        "supplier_signed_at": None,
+        "supplier_signed_by": None,
+        "status": ContractStatusEnum.PENDING_BUYER_SIGNATURE,
+        "created_at": datetime.utcnow(),
+        "executed_at": None,
+    }
+
+    # Generate contract ID
+    import uuid as _uuid
+    contract_id = f"TXB-{_uuid.uuid4().hex[:8].upper()}"
+    contract_data["contract_id"] = contract_id
+
+    # Hash the contract content for tamper detection
+    contract_text = _build_contract_text(contract_data)
+    content_hash = _hashlib.sha256(contract_text.encode()).hexdigest()
+    contract_data["content_hash"] = content_hash
+
+    await db["contracts"].insert_one(contract_data)
+
+    # Notify buyer
+    await db["notifications"].insert_one({
+        "id": str(_uuid.uuid4()),
+        "user_id": user.get("id"),
+        "type": "contract_signoff",
+        "title": "Contract Ready to Sign",
+        "message": f"Contract {contract_id} for '{rfq.get('title')}' is ready. Please review and sign.",
+        "is_read": False,
+        "created_at": datetime.utcnow(),
+        "related_id": contract_id,
+    })
+
+    return {"success": True, "contract_id": contract_id, "already_exists": False}
+
+
+@app.post("/api/contracts/{contract_id}/sign")
+async def sign_contract(contract_id: str, request: Request, user: dict = Depends(require_login)):
+    """Record a drawn digital signature for the authenticated user on the given contract."""
+    from database import db
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not available")
+
+    body = await request.json()
+    signature_image = body.get("signature_image", "")  # base64 PNG data URL
+    if not signature_image or not signature_image.startswith("data:image/png;base64,"):
+        raise HTTPException(status_code=400, detail="A drawn signature is required")
+
+    contract = await db["contracts"].find_one({"contract_id": contract_id})
+    if not contract:
+        raise HTTPException(status_code=404, detail="Contract not found")
+
+    user_id = user.get("id")
+    now = datetime.utcnow()
+    import uuid as _uuid
+
+    is_buyer    = contract.get("buyer_id") == user_id
+    is_supplier = contract.get("supplier_id") == user_id
+
+    if not is_supplier:
+        company = await db["companies"].find_one({"id": user.get("company_id")})
+        if company:
+            is_supplier = (
+                contract.get("supplier_id") == company.get("unique_id") or
+                contract.get("supplier_id") == company.get("id")
+            )
+
+    if not is_buyer and not is_supplier:
+        raise HTTPException(status_code=403, detail="You are not a party to this contract")
+
+    updates = {}
+    new_status = contract.get("status")
+
+    if is_buyer:
+        if contract.get("buyer_signed_at"):
+            return {"success": True, "message": "Already signed by buyer", "status": new_status}
+        updates["buyer_signed_at"] = now
+        updates["buyer_signed_by"] = user_id
+        updates["buyer_signature_image"] = signature_image
+        new_status = ContractStatusEnum.PENDING_SUPPLIER_SIGNATURE
+
+        supplier_user = await db["users"].find_one({
+            "$or": [
+                {"id": contract.get("supplier_id")},
+                {"company_id": contract.get("supplier_id")},
+            ]
+        })
+        if supplier_user:
+            await db["notifications"].insert_one({
+                "id": str(_uuid.uuid4()),
+                "user_id": supplier_user.get("id"),
+                "type": "contract_signoff",
+                "title": "Contract Awaiting Your Signature",
+                "message": f"The buyer has signed contract {contract_id}. Please review and sign.",
+                "is_read": False,
+                "created_at": now,
+                "related_id": contract_id,
+            })
+
+    elif is_supplier:
+        if contract.get("supplier_signed_at"):
+            return {"success": True, "message": "Already signed by supplier", "status": new_status}
+        if not contract.get("buyer_signed_at"):
+            raise HTTPException(status_code=400, detail="Buyer must sign first")
+        updates["supplier_signed_at"] = now
+        updates["supplier_signed_by"] = user_id
+        updates["supplier_signature_image"] = signature_image
+        new_status = ContractStatusEnum.FULLY_EXECUTED
+        updates["executed_at"] = now
+
+        buyer_user = await db["users"].find_one({"id": contract.get("buyer_id")})
+        if buyer_user:
+            await db["notifications"].insert_one({
+                "id": str(_uuid.uuid4()),
+                "user_id": buyer_user.get("id"),
+                "type": "contract_signoff",
+                "title": "Contract Fully Executed",
+                "message": f"Contract {contract_id} has been signed by both parties. Production can begin.",
+                "is_read": False,
+                "created_at": now,
+                "related_id": contract_id,
+            })
+
+    updates["status"] = new_status
+
+    # Recompute hash after signatures
+    updated_contract = {**contract, **updates}
+    updated_contract.pop("_id", None)
+    contract_text = _build_contract_text(updated_contract)
+    updates["content_hash"] = _hashlib.sha256(contract_text.encode()).hexdigest()
+
+    await db["contracts"].update_one(
+        {"contract_id": contract_id},
+        {"$set": updates}
+    )
+
+    return {"success": True, "message": "Contract signed successfully", "status": new_status}
+
+
+@app.get("/contracts/{contract_id}", response_class=HTMLResponse)
+async def contract_view_page(request: Request, contract_id: str, user: dict = Depends(require_login)):
+    """View and sign a contract."""
+    from database import db
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not available")
+
+    contract = await db["contracts"].find_one({"contract_id": contract_id})
+    if not contract:
+        raise HTTPException(status_code=404, detail="Contract not found")
+
+    contract.pop("_id", None)
+
+    # Determine viewer role
+    user_id = user.get("id")
+    is_buyer = contract.get("buyer_id") == user_id
+    is_supplier = contract.get("supplier_id") == user_id
+    if not is_supplier:
+        company = await db["companies"].find_one({"id": user.get("company_id")})
+        if company:
+            is_supplier = (
+                contract.get("supplier_id") == company.get("unique_id") or
+                contract.get("supplier_id") == company.get("id")
+            )
+
+    if not is_buyer and not is_supplier and not user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    # Verify hash integrity
+    contract_text = _build_contract_text(contract)
+    current_hash = _hashlib.sha256(contract_text.encode()).hexdigest()
+    hash_valid = current_hash == contract.get("content_hash", "")
+
+    return templates.TemplateResponse("contract_view.html", {
+        "request": request,
+        "user": user,
+        "contract": contract,
+        "is_buyer": is_buyer,
+        "is_supplier": is_supplier,
+        "hash_valid": hash_valid,
+        "contract_text": contract_text,
+    })
+
+
+@app.get("/contracts", response_class=HTMLResponse)
+async def contracts_list_page(request: Request, user: dict = Depends(require_login)):
+    """List all contracts for the current user."""
+    from database import db
+    contracts = []
+    if db is not None:
+        user_id = user.get("id")
+        company = await db["companies"].find_one({"id": user.get("company_id")})
+        supplier_ids = [user_id]
+        if company:
+            if company.get("unique_id"):
+                supplier_ids.append(company.get("unique_id"))
+            supplier_ids.append(company.get("id"))
+
+        async for c in db["contracts"].find({
+            "$or": [
+                {"buyer_id": user_id},
+                {"supplier_id": {"$in": supplier_ids}},
+            ]
+        }).sort("created_at", -1):
+            c.pop("_id", None)
+            contracts.append(c)
+
+    return templates.TemplateResponse("contracts_list.html", {
+        "request": request,
+        "user": user,
+        "contracts": contracts,
+    })
+
+
+@app.get("/api/contracts/{contract_id}")
+async def get_contract_api(contract_id: str, user: dict = Depends(require_login)):
+    """API endpoint to get contract data."""
+    from database import db
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not available")
+
+    contract = await db["contracts"].find_one({"contract_id": contract_id})
+    if not contract:
+        raise HTTPException(status_code=404, detail="Contract not found")
+
+    contract.pop("_id", None)
+    # Serialize datetimes
+    for key in ("created_at", "executed_at", "buyer_signed_at", "supplier_signed_at"):
+        if isinstance(contract.get(key), datetime):
+            contract[key] = contract[key].isoformat() + "Z"
+
+    return {"success": True, "contract": contract}
+
+
+@app.get("/admin/contracts", response_class=HTMLResponse)
+async def admin_contracts_page(request: Request, admin: dict = Depends(require_admin)):
+    """Admin view of all contracts."""
+    from database import db
+    contracts = []
+    if db is not None:
+        async for c in db["contracts"].find({}).sort("created_at", -1):
+            c.pop("_id", None)
+            contracts.append(c)
+    return templates.TemplateResponse("admin_contracts.html", {
+        "request": request,
+        "user": admin,
+        "contracts": contracts,
+    })
