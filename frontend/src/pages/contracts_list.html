@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}My Contracts – TexBid{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50 py-10">
+  <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+
+    <div class="mb-8 flex items-center justify-between">
+      <div>
+        <h1 class="text-3xl font-extrabold text-gray-900">My Contracts</h1>
+        <p class="text-gray-500 text-sm mt-1">All contracts you are a party to.</p>
+      </div>
+    </div>
+
+    {% if contracts %}
+    <div class="bg-white rounded-2xl shadow-lg overflow-hidden">
+      <div class="hidden md:block overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="bg-gray-50 text-left">
+              <th class="px-5 py-3 text-xs font-bold text-gray-500 uppercase">Contract ID</th>
+              <th class="px-5 py-3 text-xs font-bold text-gray-500 uppercase">RFQ</th>
+              <th class="px-5 py-3 text-xs font-bold text-gray-500 uppercase">Value (BDT)</th>
+              <th class="px-5 py-3 text-xs font-bold text-gray-500 uppercase">Status</th>
+              <th class="px-5 py-3 text-xs font-bold text-gray-500 uppercase">Created</th>
+              <th class="px-5 py-3 text-xs font-bold text-gray-500 uppercase">Action</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            {% for c in contracts %}
+            <tr class="hover:bg-gray-50 transition-colors">
+              <td class="px-5 py-4">
+                <p class="font-mono text-xs font-bold text-blue-700">{{ c.contract_id }}</p>
+              </td>
+              <td class="px-5 py-4">
+                <p class="font-semibold text-gray-900 truncate max-w-[180px]">{{ c.rfq_title }}</p>
+                <p class="text-xs text-gray-400">{{ c.rfq_product_category }}</p>
+              </td>
+              <td class="px-5 py-4">
+                <p class="font-bold text-gray-900">{{ "{:,.0f}".format(c.bid_total_value) }}</p>
+              </td>
+              <td class="px-5 py-4">
+                {% if c.status == 'FULLY_EXECUTED' %}
+                <span class="px-2 py-0.5 rounded-full bg-green-100 text-green-800 text-xs font-bold">Executed</span>
+                {% elif c.status == 'PENDING_SUPPLIER_SIGNATURE' %}
+                <span class="px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 text-xs font-bold">Awaiting Supplier</span>
+                {% elif c.status == 'PENDING_BUYER_SIGNATURE' %}
+                <span class="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-bold">Awaiting Buyer</span>
+                {% else %}
+                <span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 text-xs font-bold">{{ c.status }}</span>
+                {% endif %}
+              </td>
+              <td class="px-5 py-4 text-xs text-gray-500">
+                {{ c.created_at.strftime('%d %b %Y') if c.created_at is not string else c.created_at[:10] }}
+              </td>
+              <td class="px-5 py-4">
+                <a href="/contracts/{{ c.contract_id }}"
+                  class="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800">
+                  View / Sign →
+                </a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Mobile cards -->
+      <div class="md:hidden divide-y divide-gray-100">
+        {% for c in contracts %}
+        <div class="p-4 space-y-2">
+          <div class="flex items-start justify-between">
+            <div>
+              <p class="font-mono text-xs font-bold text-blue-700">{{ c.contract_id }}</p>
+              <p class="font-semibold text-gray-900 mt-0.5">{{ c.rfq_title }}</p>
+              <p class="text-xs text-gray-400">BDT {{ "{:,.0f}".format(c.bid_total_value) }}</p>
+            </div>
+            {% if c.status == 'FULLY_EXECUTED' %}
+            <span class="px-2 py-0.5 rounded-full bg-green-100 text-green-800 text-xs font-bold">Executed</span>
+            {% elif c.status == 'PENDING_SUPPLIER_SIGNATURE' %}
+            <span class="px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 text-xs font-bold">Awaiting Supplier</span>
+            {% else %}
+            <span class="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-bold">Awaiting Buyer</span>
+            {% endif %}
+          </div>
+          <a href="/contracts/{{ c.contract_id }}"
+            class="block text-center py-2 border border-blue-200 rounded-lg text-sm font-semibold text-blue-600 hover:bg-blue-50">
+            View / Sign
+          </a>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    {% else %}
+    <div class="bg-white rounded-2xl shadow-lg p-16 text-center">
+      <svg class="h-12 w-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+      </svg>
+      <h3 class="text-lg font-bold text-gray-900 mb-2">No contracts yet</h3>
+      <p class="text-gray-500 text-sm">Contracts appear here after a buyer generates one from an accepted bid.</p>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endblock %}
