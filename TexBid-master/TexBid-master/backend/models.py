@@ -44,6 +44,15 @@ class SubscriptionTierEnum(str, Enum):
     FREE = "FREE"
     PREMIUM = "PREMIUM"
 
+class EscrowStatusEnum(str, Enum):
+    PENDING = "PENDING"
+    PAID_IN_ESCROW = "PAID_IN_ESCROW"
+    WORK_IN_PROGRESS = "WORK_IN_PROGRESS"
+    SENT_FOR_DELIVERY = "SENT_FOR_DELIVERY"
+    RELEASED = "RELEASED"
+    REFUNDED = "REFUNDED"
+    DISPUTED = "DISPUTED"
+
 class UserModel(BaseModel):
     """Model for user authentication."""
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="Unique user ID")
@@ -168,3 +177,109 @@ class NotificationModel(BaseModel):
     is_read: bool = Field(default=False, description="Whether notification has been read")
     created_at: datetime = Field(default_factory=datetime.utcnow, description="When notification was created")
     related_id: Optional[str] = Field(None, description="Related entity ID (RFQ, bid, etc.)")
+
+class PaymentModel(BaseModel):
+    payment_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    transaction_id: str = Field(..., description="Unique txnid for gateway")
+    order_id: str = Field(..., description="Linked RFQ or Order ID")
+    bid_id: Optional[str] = Field(None, description="Linked Bid ID")
+    buyer_id: str = Field(...)
+    supplier_id: str = Field(...)
+    amount: float = Field(...)
+    original_amount: float = Field(default=0.0, description="Amount in local currency")
+    original_currency: str = Field(default="BDT", description="Local currency code")
+    base_amount_usd: float = Field(default=0.0, description="Equivalent amount in USD")
+    exchange_rate: float = Field(default=1.0, description="Conversion rate used")
+    status: EscrowStatusEnum = Field(default=EscrowStatusEnum.PENDING)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+# ----------------------------------------
+# CONTRACT MODELS
+# ----------------------------------------
+
+class ContractStatusEnum(str, Enum):
+    DRAFT = "DRAFT"
+    PENDING_BUYER_SIGNATURE = "PENDING_BUYER_SIGNATURE"
+    PENDING_SUPPLIER_SIGNATURE = "PENDING_SUPPLIER_SIGNATURE"
+    FULLY_EXECUTED = "FULLY_EXECUTED"
+    VOIDED = "VOIDED"
+
+
+class ContractModel(BaseModel):
+    contract_id: str = Field(default_factory=lambda: f"TXB-{str(uuid.uuid4())[:8].upper()}")
+    rfq_id: str = Field(...)
+    bid_id: str = Field(...)
+    payment_id: Optional[str] = Field(None)
+    buyer_id: str = Field(...)
+    supplier_id: str = Field(...)
+    status: ContractStatusEnum = Field(default=ContractStatusEnum.PENDING_BUYER_SIGNATURE)
+
+    # Snapshot of deal data at contract generation time
+    rfq_title: str = Field(default="")
+    rfq_product_category: str = Field(default="")
+    rfq_quantity: int = Field(default=0)
+    rfq_incoterm: str = Field(default="FOB")
+    rfq_shipping_method: str = Field(default="")
+    rfq_destination_port: str = Field(default="")
+    rfq_proto_sample_req: bool = Field(default=False)
+    rfq_pp_sample_req: bool = Field(default=False)
+    rfq_fabric_type: str = Field(default="")
+    rfq_special_instructions: str = Field(default="")
+
+    bid_price: float = Field(default=0.0)
+    bid_total_value: float = Field(default=0.0)
+    bid_supplier_name: str = Field(default="")
+
+    buyer_legal_name: str = Field(default="")
+    buyer_email: str = Field(default="")
+    supplier_legal_name: str = Field(default="")
+    supplier_email: str = Field(default="")
+
+    # Signature records
+    buyer_signed_at: Optional[datetime] = Field(None)
+    buyer_signed_by: Optional[str] = Field(None)   # user_id
+    supplier_signed_at: Optional[datetime] = Field(None)
+    supplier_signed_by: Optional[str] = Field(None)  # user_id
+
+    # SHA-256 hash of contract content for tamper detection
+    content_hash: str = Field(default="")
+
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    executed_at: Optional[datetime] = Field(None)
+
+
+# ----------------------------------------
+# SHIPPING & INCOTERMS CALCULATOR MODELS
+# ----------------------------------------
+
+class ShippingMethodEnum(str, Enum):
+    SEA = "SEA"
+    AIR = "AIR"
+    ROAD = "ROAD"
+
+class IncotermEnum(str, Enum):
+    EXW = "EXW"
+    FOB = "FOB"
+    CFR = "CFR"
+    CIF = "CIF"
+    DAP = "DAP"
+    DDP = "DDP"
+
+class ShippingCalculateRequest(BaseModel):
+    rfq_id: Optional[str] = None
+    origin_port_code: str = Field(..., description="Origin port code e.g. BDCGP")
+    dest_port_code: str = Field(..., description="Destination port code e.g. NLRTM")
+    shipping_method: ShippingMethodEnum = Field(default=ShippingMethodEnum.SEA)
+    incoterm: IncotermEnum = Field(default=IncotermEnum.FOB)
+    quantity: int = Field(..., gt=0, description="Number of garment units")
+    goods_value_usd: Optional[float] = Field(default=0.0, ge=0)
+
+class ShippingRateModel(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    origin_region: str = Field(..., description="e.g. Asia, Europe, Americas")
+    dest_region: str = Field(..., description="e.g. Asia, Europe, Americas")
+    method: ShippingMethodEnum = Field(default=ShippingMethodEnum.SEA)
+    base_rate_per_kg: float = Field(..., gt=0, description="USD per kg")
+    updated_at: datetime = Field(default_factory=datetime.utcnow)

@@ -1,0 +1,276 @@
+{% extends "base.html" %}
+
+{% block title %}Secure Payment – TexBid{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 py-12">
+  <div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
+
+    <!-- Back link -->
+    <a href="/dashboard" class="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 mb-6 transition-colors">
+      <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+      </svg>
+      Back to Dashboard
+    </a>
+
+    <!-- Header -->
+    <div class="mb-8 text-center">
+      <div class="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
+        <svg class="h-8 w-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+        </svg>
+      </div>
+      <h1 class="text-3xl font-extrabold text-gray-900">Secure Escrow Payment</h1>
+      <p class="mt-2 text-gray-500 text-sm">Your funds are held safely until the order is fulfilled.</p>
+    </div>
+
+    <!-- Order Summary Card -->
+    <div class="bg-white rounded-2xl shadow-lg overflow-hidden mb-6">
+      <div class="px-6 py-4 bg-gradient-to-r from-brand-primary to-brand-light">
+        <h2 class="text-lg font-bold text-white flex items-center gap-2">
+          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
+          Order Summary
+        </h2>
+      </div>
+      <div class="p-6 space-y-4">
+        <div class="flex justify-between items-start">
+          <div>
+            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide">RFQ Title</p>
+            <p class="text-base font-bold text-gray-900 mt-0.5">{{ rfq.title }}</p>
+          </div>
+          <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800">
+            {{ rfq.status }}
+          </span>
+        </div>
+        <div class="grid grid-cols-2 gap-4 pt-2 border-t border-gray-100">
+          <div>
+            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Product</p>
+            <p class="text-sm font-semibold text-gray-800 mt-0.5">{{ rfq.product_category }}</p>
+          </div>
+          <div>
+            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Quantity</p>
+            <p class="text-sm font-semibold text-gray-800 mt-0.5">{{ "{:,}".format(rfq.quantity) }} units</p>
+          </div>
+          <div>
+            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Bid Price / Unit</p>
+            <p class="text-sm font-semibold text-gray-800 mt-0.5">{{ "{:,.2f}".format(bid.bid_price) }} BDT</p>
+          </div>
+          <div>
+            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Supplier</p>
+            <p class="text-sm font-semibold text-gray-800 mt-0.5">{{ bid.supplier_name }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Currency Conversion Card -->
+    <div class="bg-white rounded-2xl shadow-lg overflow-hidden mb-6">
+      <div class="px-6 py-4 border-b border-gray-100">
+        <h2 class="text-lg font-bold text-gray-900 flex items-center gap-2">
+          <svg class="h-5 w-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          Currency Conversion
+        </h2>
+        <p class="text-xs text-gray-400 mt-1">Live rate via ExchangeRate API · Rate locked at payment time</p>
+      </div>
+      <div class="p-6">
+        <!-- Big conversion display -->
+        <div class="flex items-center justify-between bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-5 mb-4">
+          <div class="text-center">
+            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">You Pay (BDT)</p>
+            <p class="text-3xl font-extrabold text-gray-900" id="local-amount">
+              ৳ {{ "{:,.2f}".format(total_local) }}
+            </p>
+          </div>
+          <div class="flex flex-col items-center px-4">
+            <svg class="h-8 w-8 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
+            </svg>
+            <span class="text-xs text-gray-400 mt-1">≈</span>
+          </div>
+          <div class="text-center">
+            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">USD Equivalent</p>
+            <p class="text-3xl font-extrabold text-green-700" id="usd-amount">
+              $ {{ "{:,.2f}".format(usd_amount) }}
+            </p>
+          </div>
+        </div>
+
+        <!-- Rate details -->
+        <div class="grid grid-cols-3 gap-3 text-center">
+          <div class="bg-gray-50 rounded-lg p-3">
+            <p class="text-xs text-gray-400 font-semibold uppercase tracking-wide">Exchange Rate</p>
+            <p class="text-sm font-bold text-gray-800 mt-1">1 USD = {{ exchange_rate }} BDT</p>
+          </div>
+          <div class="bg-gray-50 rounded-lg p-3">
+            <p class="text-xs text-gray-400 font-semibold uppercase tracking-wide">Base Currency</p>
+            <p class="text-sm font-bold text-gray-800 mt-1">USD (stored)</p>
+          </div>
+          <div class="bg-gray-50 rounded-lg p-3">
+            <p class="text-xs text-gray-400 font-semibold uppercase tracking-wide">Payment Method</p>
+            <p class="text-sm font-bold text-blue-700 mt-1">Card Only</p>
+          </div>
+        </div>
+
+        <!-- Currency selector (live recalculation) -->
+        <div class="mt-5 pt-4 border-t border-gray-100">
+          <label class="block text-sm font-semibold text-gray-700 mb-2">Change Currency</label>
+          <div class="flex gap-3">
+            <select id="currency-select"
+              class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+              <option value="BDT" selected>BDT – Bangladeshi Taka</option>
+              <option value="USD">USD – US Dollar</option>
+              <option value="EUR">EUR – Euro</option>
+              <option value="GBP">GBP – British Pound</option>
+              <option value="INR">INR – Indian Rupee</option>
+            </select>
+            <button id="recalculate-btn"
+              class="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors">
+              Recalculate
+            </button>
+          </div>
+          <p id="conversion-note" class="text-xs text-gray-400 mt-2 hidden">
+            Fetching live rate…
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Escrow Info Banner -->
+    <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 flex gap-3">
+      <svg class="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+      </svg>
+      <div>
+        <p class="text-sm font-bold text-amber-800">Funds held in Escrow</p>
+        <p class="text-xs text-amber-700 mt-0.5">
+          Your payment is locked until the supplier fulfills the order. The admin can release or dispute funds at any time.
+        </p>
+      </div>
+    </div>
+
+    <!-- Pay Button -->
+    <form id="payment-form">
+      <input type="hidden" id="order-id" value="{{ rfq.id }}">
+      <input type="hidden" id="bid-id" value="{{ bid.id }}">
+      <input type="hidden" id="supplier-id" value="{{ bid.supplier_id }}">
+      <input type="hidden" id="selected-currency" value="BDT">
+      <input type="hidden" id="final-amount" value="{{ total_local }}">
+
+      <button type="button" id="pay-btn"
+        class="w-full flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold text-lg rounded-xl shadow-lg transition-all duration-200 transform hover:scale-[1.01] active:scale-[0.99]">
+        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+        </svg>
+        Pay by Card via SSLCommerz
+      </button>
+      <p class="text-center text-xs text-gray-400 mt-3">
+        Secured by SSLCommerz · 256-bit SSL encryption · Card payments only
+      </p>
+    </form>
+
+  </div>
+</div>
+
+<script>
+  const payBtn = document.getElementById('pay-btn');
+  const currencySelect = document.getElementById('currency-select');
+  const recalcBtn = document.getElementById('recalculate-btn');
+  const conversionNote = document.getElementById('conversion-note');
+  const localAmountEl = document.getElementById('local-amount');
+  const usdAmountEl = document.getElementById('usd-amount');
+  const selectedCurrencyInput = document.getElementById('selected-currency');
+  const finalAmountInput = document.getElementById('final-amount');
+
+  // Base amount in BDT from server
+  const baseBDT = {{ total_local }};
+  const baseQty = {{ rfq.quantity }};
+  const bidPrice = {{ bid.bid_price }};
+
+  async function recalculate() {
+    const currency = currencySelect.value;
+    conversionNote.classList.remove('hidden');
+    conversionNote.textContent = 'Fetching live rate…';
+
+    try {
+      // Calculate local amount: bid_price * qty, but in selected currency
+      // We fetch the conversion from the server which uses the live rate
+      const localAmount = bidPrice * baseQty;
+      const res = await fetch(`/api/currency/convert?amount=${localAmount}&currency=BDT`);
+      const data = await res.json();
+
+      // Now convert that USD amount to the selected currency
+      const rateRes = await fetch(`/api/currency/convert?amount=${data.base_amount_usd}&currency=USD`);
+      // Actually, let's just convert the BDT total to the selected currency via USD
+      const convertRes = await fetch(`/api/currency/convert?amount=${localAmount}&currency=BDT`);
+      const convertData = await convertRes.json();
+
+      // Get rate for selected currency
+      const rateForCurrency = await fetch(`/api/currency/convert?amount=1&currency=${currency}`);
+      const rateData = await rateForCurrency.json();
+
+      // local amount in selected currency = usd_amount * rate_of_selected_currency
+      const usdAmt = convertData.base_amount_usd;
+      const localInCurrency = usdAmt * rateData.exchange_rate;
+
+      localAmountEl.textContent = `${currency} ${localInCurrency.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+      usdAmountEl.textContent = `$ ${usdAmt.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+
+      selectedCurrencyInput.value = currency;
+      finalAmountInput.value = localInCurrency.toFixed(2);
+
+      conversionNote.textContent = `1 USD = ${rateData.exchange_rate.toFixed(4)} ${currency} · Rate fetched live`;
+    } catch (e) {
+      conversionNote.textContent = 'Could not fetch live rate. Using cached rate.';
+    }
+  }
+
+  recalcBtn.addEventListener('click', recalculate);
+
+  payBtn.addEventListener('click', async () => {
+    payBtn.disabled = true;
+    payBtn.innerHTML = `
+      <svg class="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+      </svg>
+      Processing…`;
+
+    try {
+      const res = await fetch('/api/payment/initiate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          order_id: document.getElementById('order-id').value,
+          bid_id: document.getElementById('bid-id').value,
+          amount: parseFloat(document.getElementById('final-amount').value),
+          currency: document.getElementById('selected-currency').value,
+          supplier_id: document.getElementById('supplier-id').value,
+        })
+      });
+
+      const data = await res.json();
+      if (data.success && data.redirect_url) {
+        window.location.href = data.redirect_url;
+      } else {
+        alert('Payment initiation failed. Please try again.');
+        payBtn.disabled = false;
+        payBtn.innerHTML = 'Pay by Card via SSLCommerz';
+      }
+    } catch (e) {
+      alert('Network error. Please try again.');
+      payBtn.disabled = false;
+      payBtn.innerHTML = 'Pay by Card via SSLCommerz';
+    }
+  });
+</script>
+{% endblock %}
