@@ -1,0 +1,502 @@
+{% extends "base.html" %}
+
+{% block title %}My Bids - TexBid{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-[#f8f9fb] py-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6">
+        
+        <!-- Header -->
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-slate-900">My Bids</h1>
+            <p class="text-sm text-slate-500 mt-1">Manage and track your submitted bids to buyers.</p>
+        </div>
+
+        <!-- Bids Table -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            {% if bids_data and bids_data|length > 0 %}
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-50 border-b border-slate-200">
+                            <th class="py-4 px-6 text-xs font-bold text-slate-500 uppercase tracking-wider">RFQ / Product</th>
+                            <th class="py-4 px-6 text-xs font-bold text-slate-500 uppercase tracking-wider">Bid Amount</th>
+                            <th class="py-4 px-6 text-xs font-bold text-slate-500 uppercase tracking-wider">Delivery Time</th>
+                            <th class="py-4 px-6 text-xs font-bold text-slate-500 uppercase tracking-wider">Date Submitted</th>
+                            <th class="py-4 px-6 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                            <th class="py-4 px-6 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for item in bids_data %}
+                        <tr class="hover:bg-slate-50/50 transition" id="bid-row-{{ item.bid.id }}">
+                            <td class="py-4 px-6">
+                                <div class="font-bold text-slate-900">{{ item.rfq.title or 'Unknown RFQ' }}</div>
+                                <div class="text-xs text-slate-500 mt-1">ID: {{ item.bid.rfq_id[:8] }}... | {{ item.rfq.product_category or 'N/A' }}</div>
+                            </td>
+                            <td class="py-4 px-6 font-semibold text-slate-800">
+                                $<span class="bid-price-val">{{ "%.2f"|format(item.bid.bid_price) }}</span> / unit
+                            </td>
+                            <td class="py-4 px-6 text-slate-600">
+                                <span class="bid-delivery-val">{{ item.bid.delivery_time_days or '-' }}</span> days
+                                <div class="text-xs text-slate-400 mt-0.5"><span class="bid-incoterms-val">{{ item.bid.incoterms or '' }}</span></div>
+                            </td>
+                            <td class="py-4 px-6 text-sm text-slate-600">
+                                {{ item.bid.timestamp.strftime('%b %d, %Y') if item.bid.timestamp else 'N/A' }}
+                            </td>
+                            <td class="py-4 px-6">
+                                {% if item.bid.bid_status == 'ACCEPTED' %}
+                                    <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-green-100 text-green-800 border border-green-200">ACCEPTED</span>
+                                {% elif item.bid.bid_status == 'REJECTED' %}
+                                    <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-800 border border-red-200">REJECTED</span>
+                                {% else %}
+                                    <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">PENDING</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-4 px-6 text-right">
+                                {% if item.bid.bid_status not in ['ACCEPTED', 'REJECTED'] %}
+                                    <button onclick='openChatDrawer("{{ item.rfq.buyer_id }}", {{ item.buyer_name | default("Buyer", true) | tojson }}, "{{ item.rfq.id }}", {{ item.rfq.title | default("RFQ", true) | tojson }})' class="text-sm font-semibold text-teal-600 hover:text-teal-800 mr-3">Chat</button>
+                                    <button onclick="openEditModal('{{ item.bid.id }}', '{{ item.rfq.title }}', {{ item.bid.bid_price }}, {{ item.bid.delivery_time_days or 0 }}, '{{ item.bid.incoterms or 'FOB' }}')" class="text-sm font-semibold text-blue-600 hover:text-blue-800 mr-3">Edit</button>
+                                    <button onclick="confirmWithdraw('{{ item.bid.id }}')" class="text-sm font-semibold text-red-600 hover:text-red-800">Withdraw</button>
+                                {% else %}
+                                    <button onclick='openChatDrawer("{{ item.rfq.buyer_id }}", {{ item.buyer_name | default("Buyer", true) | tojson }}, "{{ item.rfq.id }}", {{ item.rfq.title | default("RFQ", true) | tojson }})' class="text-sm font-semibold text-teal-600 hover:text-teal-800 mr-3">Chat</button>
+                                    <span class="text-xs text-slate-400">No other actions</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="py-16 text-center">
+                <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg class="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                </div>
+                <h3 class="text-lg font-bold text-slate-900 mb-1">No Bids Found</h3>
+                <p class="text-sm text-slate-500 max-w-md mx-auto">You haven't placed any bids yet. Head over to the Marketplace to find RFQs to bid on.</p>
+                <a href="/feed" class="inline-flex items-center gap-2 mt-6 px-6 py-2.5 bg-[#1b4478] text-white text-sm font-bold rounded-lg hover:bg-[#143560] transition">
+                    Browse RFQs
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Chat Slide-out Drawer -->
+<div id="chatDrawer" class="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col border-l border-gray-200">
+  <!-- Chat Header -->
+  <div class="px-5 py-4 bg-gradient-to-r from-slate-900 to-blue-950 text-white flex items-center justify-between flex-shrink-0">
+    <div>
+      <h3 id="chatSupplierName" class="font-bold text-sm">Chat</h3>
+      <p id="chatRfqLabel" class="text-xs text-blue-300">RFQ Negotiation</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <span id="chatStatus" class="w-2 h-2 rounded-full bg-green-400"></span>
+      <button onclick="closeChatDrawer()" class="p-1.5 rounded-lg hover:bg-white/10 transition-colors">
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+  </div>
+  <!-- Messages Area -->
+  <div id="chatMessages" class="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
+    <div class="text-center py-8">
+      <p class="text-xs text-gray-400">Loading messages...</p>
+    </div>
+  </div>
+  <!-- Input Area -->
+  <div class="p-4 border-t border-gray-200 bg-white flex-shrink-0">
+    <div class="flex gap-2 items-center">
+      <label class="cursor-pointer text-gray-400 hover:text-blue-600 transition-colors">
+        <input type="file" id="chatImageInput" accept="image/jpeg,image/png,image/gif,image/webp" class="hidden" onchange="uploadChatImage()">
+        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+        </svg>
+      </label>
+      <input id="chatInput" type="text" placeholder="Type a message..." class="flex-1 px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" onkeydown="if(event.key==='Enter')sendChatMessage()">
+      <button onclick="sendChatMessage()" class="px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors flex-shrink-0">
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+<!-- Chat backdrop -->
+<div id="chatBackdrop" class="hidden fixed inset-0 bg-black/30 z-40" onclick="closeChatDrawer()"></div>
+
+<!-- Edit Bid Modal -->
+<div id="editBidModal" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="closeEditModal()"></div>
+    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white rounded-2xl shadow-2xl p-6">
+        <div class="flex items-center justify-between mb-5">
+            <h3 class="text-xl font-bold text-slate-900">Edit Bid</h3>
+            <button onclick="closeEditModal()" class="text-slate-400 hover:text-slate-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+        
+        <form id="editBidForm" class="space-y-4">
+            <input type="hidden" id="edit_bid_id" name="bid_id">
+            
+            <div class="bg-slate-50 p-3 rounded-lg border border-slate-100 mb-2">
+                <p class="text-xs text-slate-500">RFQ</p>
+                <p class="text-sm font-semibold text-slate-800" id="edit_rfq_title">Premium Cotton Tees</p>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-1">Bid Price (Per Unit)</label>
+                <div class="relative">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold">$</span>
+                    <input type="number" step="0.01" id="edit_bid_price" name="bid_price" required class="w-full pl-8 pr-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#1b4478]/20 focus:border-[#1b4478] text-sm">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">Delivery Time (Days)</label>
+                    <input type="number" id="edit_delivery_time" name="delivery_time_days" required class="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#1b4478]/20 focus:border-[#1b4478] text-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">Incoterms</label>
+                    <select id="edit_incoterms" name="incoterms" required class="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#1b4478]/20 focus:border-[#1b4478] text-sm">
+                        <option value="FOB">FOB</option>
+                        <option value="CIF">CIF</option>
+                        <option value="EXW">EXW</option>
+                        <option value="DDP">DDP</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="pt-4 mt-2 flex gap-3">
+                <button type="button" onclick="closeEditModal()" class="flex-1 px-4 py-2 bg-slate-100 text-slate-700 text-sm font-bold rounded-lg hover:bg-slate-200 transition">Cancel</button>
+                <button type="submit" id="editBidSubmitBtn" class="flex-1 px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-lg hover:bg-blue-700 transition">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Withdraw Confirm Modal -->
+<div id="withdrawModal" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="closeWithdrawModal()"></div>
+    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm bg-white rounded-2xl shadow-2xl p-6 text-center">
+        <div class="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-4">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+        </div>
+        <h3 class="text-xl font-bold text-slate-900 mb-2">Withdraw Bid?</h3>
+        <p class="text-sm text-slate-500 mb-6">Are you sure you want to withdraw this bid? This action cannot be undone.</p>
+        
+        <input type="hidden" id="withdraw_bid_id">
+        
+        <div class="flex gap-3">
+            <button onclick="closeWithdrawModal()" class="flex-1 px-4 py-2 bg-slate-100 text-slate-700 text-sm font-bold rounded-lg hover:bg-slate-200 transition">Cancel</button>
+            <button onclick="submitWithdraw()" id="withdrawSubmitBtn" class="flex-1 px-4 py-2 bg-red-600 text-white text-sm font-bold rounded-lg hover:bg-red-700 transition">Withdraw</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ─── Chat Drawer Logic ───
+const CURRENT_USER_ID = "{{ company.unique_id or company.id if company else user.id }}";
+let chatSocket = null;
+let chatReceiverId = null;
+let currentChatRfqId = null;
+
+function openChatDrawer(receiverId, receiverName, rfqId, rfqTitle) {
+  chatReceiverId = receiverId;
+  currentChatRfqId = rfqId;
+  document.getElementById('chatSupplierName').textContent = receiverName;
+  document.getElementById('chatRfqLabel').textContent = `RFQ: ${rfqTitle || rfqId}`;
+  document.getElementById('chatDrawer').classList.remove('translate-x-full');
+  document.getElementById('chatBackdrop').classList.remove('hidden');
+  document.getElementById('chatMessages').innerHTML = '<div class="text-center py-8"><p class="text-xs text-gray-400">Loading messages...</p></div>';
+
+  loadChatHistory(receiverId, rfqId);
+  connectWebSocket(rfqId);
+}
+
+function closeChatDrawer() {
+  document.getElementById('chatDrawer').classList.add('translate-x-full');
+  document.getElementById('chatBackdrop').classList.add('hidden');
+  if (chatSocket && chatSocket.readyState === WebSocket.OPEN) {
+    chatSocket.close();
+  }
+  chatSocket = null;
+  chatReceiverId = null;
+  currentChatRfqId = null;
+}
+
+async function loadChatHistory(receiverId, rfqId) {
+  try {
+    const res = await fetch(`/api/chat/${rfqId}/history?receiver_id=${receiverId}`);
+    const data = await res.json();
+    const container = document.getElementById('chatMessages');
+
+    if (data.success && data.messages.length > 0) {
+      container.innerHTML = data.messages.map(m => renderChatBubble(m)).join('');
+    } else {
+      container.innerHTML = '<div class="text-center py-8"><div class="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-3"><svg class="h-6 w-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg></div><p class="text-xs text-gray-400">Start the conversation</p></div>';
+    }
+    container.scrollTop = container.scrollHeight;
+  } catch (err) {
+    console.error('Error loading chat history:', err);
+  }
+}
+
+function connectWebSocket(rfqId) {
+  if (chatSocket && chatSocket.readyState === WebSocket.OPEN) chatSocket.close();
+  
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  chatSocket = new WebSocket(`${protocol}//${window.location.host}/ws/chat/${rfqId}/${CURRENT_USER_ID}`);
+
+  chatSocket.onopen = () => {
+    document.getElementById('chatStatus').classList.replace('bg-red-400', 'bg-green-400');
+  };
+
+  chatSocket.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+    if (msg.sender_id !== chatReceiverId && msg.receiver_id !== chatReceiverId) {
+      return;
+    }
+    const container = document.getElementById('chatMessages');
+    if (document.querySelector(`[data-msg-id="${msg.id}"]`)) return;
+    
+    // Remove empty-state placeholder if present
+    const placeholder = container.querySelector('.text-center.py-8');
+    if (placeholder) placeholder.remove();
+
+    container.insertAdjacentHTML('beforeend', renderChatBubble(msg));
+    container.scrollTop = container.scrollHeight;
+  };
+
+  chatSocket.onclose = () => {
+    document.getElementById('chatStatus').classList.replace('bg-green-400', 'bg-red-400');
+  };
+}
+
+async function uploadChatImage() {
+  const input = document.getElementById('chatImageInput');
+  const file = input.files[0];
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append('image', file);
+
+  try {
+    const res = await fetch('/api/chat/upload-image', {
+      method: 'POST',
+      body: formData
+    });
+    const data = await res.json();
+    if (data.success) {
+      sendChatMessage(data.image_url);
+    } else {
+      alert('Failed to upload image: ' + data.detail);
+    }
+  } catch (err) {
+    console.error('Upload error:', err);
+    alert('Error uploading image');
+  } finally {
+    input.value = '';
+  }
+}
+
+async function sendChatMessage(imageUrl = null) {
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text && !imageUrl) return;
+
+  const msgPayload = {
+    receiver_id: chatReceiverId,
+    content: text,
+    image_url: imageUrl || ""
+  };
+
+  if (chatSocket && chatSocket.readyState === WebSocket.OPEN) {
+    chatSocket.send(JSON.stringify(msgPayload));
+  } else {
+    try {
+      await fetch(`/api/chat/${currentChatRfqId}/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(msgPayload)
+      });
+      const data = await res.json();
+      if (data.success) {
+        // HTTP fallback success. Append locally.
+        const container = document.getElementById('chatMessages');
+        if (!document.querySelector(`[data-msg-id="${data.message.id}"]`)) {
+            const placeholder = container.querySelector('.text-center.py-8');
+            if (placeholder) placeholder.remove();
+            container.insertAdjacentHTML('beforeend', renderChatBubble(data.message));
+            container.scrollTop = container.scrollHeight;
+        }
+      }
+    } catch (err) {
+      console.error('HTTP send error:', err);
+    }
+  }
+
+  input.value = '';
+}
+
+function renderChatBubble(msg) {
+  const isMe = msg.sender_id === CURRENT_USER_ID;
+  const time = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
+  
+  let contentHtml = '';
+  if (msg.image_url) {
+    contentHtml += `<img src="${msg.image_url}" class="max-w-full h-auto rounded-lg mb-2" alt="Attached image">`;
+  }
+  if (msg.content) {
+    contentHtml += `<span>${msg.content.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</span>`;
+  }
+
+  if (isMe) {
+    return `
+      <div class="flex flex-col items-end" data-msg-id="${msg.id || ''}">
+        <div class="bg-blue-600 text-white rounded-2xl rounded-tr-sm px-4 py-2 max-w-[85%] shadow-sm">
+          <p class="text-sm">${contentHtml}</p>
+        </div>
+        <span class="text-[10px] text-gray-400 mt-1">${time}</span>
+      </div>`;
+  } else {
+    return `
+      <div class="flex flex-col items-start" data-msg-id="${msg.id || ''}">
+        <div class="bg-white border border-gray-100 rounded-2xl rounded-tl-sm px-4 py-2 max-w-[85%] shadow-sm">
+          <p class="text-sm text-gray-800">${contentHtml}</p>
+        </div>
+        <span class="text-[10px] text-gray-400 mt-1">${time}</span>
+      </div>`;
+  }
+}
+
+// Auto-open chat if query param present
+document.addEventListener('DOMContentLoaded', () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const openChatId = urlParams.get('open_chat');
+  const rfqId = urlParams.get('rfq_id');
+  if (openChatId && rfqId) {
+    setTimeout(() => {
+      const btn = document.querySelector(`button[onclick*="openChatDrawer('${openChatId}'"]`);
+      if (btn) {
+        btn.click();
+      } else {
+        openChatDrawer(openChatId, 'Buyer', rfqId, 'RFQ ' + rfqId);
+      }
+    }, 300);
+    // Clean up URL
+    const newUrl = window.location.pathname;
+    window.history.replaceState({}, '', newUrl);
+  }
+});
+
+// Modal handlers
+const editModal = document.getElementById('editBidModal');
+const withdrawModal = document.getElementById('withdrawModal');
+
+function openEditModal(bidId, rfqTitle, price, delivery, incoterms) {
+    document.getElementById('edit_bid_id').value = bidId;
+    document.getElementById('edit_rfq_title').textContent = rfqTitle;
+    document.getElementById('edit_bid_price').value = price;
+    document.getElementById('edit_delivery_time').value = delivery;
+    document.getElementById('edit_incoterms').value = incoterms;
+    editModal.classList.remove('hidden');
+}
+
+function closeEditModal() {
+    editModal.classList.add('hidden');
+}
+
+function confirmWithdraw(bidId) {
+    document.getElementById('withdraw_bid_id').value = bidId;
+    withdrawModal.classList.remove('hidden');
+}
+
+function closeWithdrawModal() {
+    withdrawModal.classList.add('hidden');
+}
+
+// Form submissions
+document.getElementById('editBidForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('editBidSubmitBtn');
+    const bidId = document.getElementById('edit_bid_id').value;
+    
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+    
+    const formData = new FormData(e.target);
+    
+    try {
+        const response = await fetch(`/api/bid/${bidId}`, {
+            method: 'PUT',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            // Update UI dynamically
+            const row = document.getElementById(`bid-row-${bidId}`);
+            if (row) {
+                row.querySelector('.bid-price-val').textContent = parseFloat(formData.get('bid_price')).toFixed(2);
+                row.querySelector('.bid-delivery-val').textContent = formData.get('delivery_time_days');
+                row.querySelector('.bid-incoterms-val').textContent = formData.get('incoterms');
+                
+                // Update onclick attributes
+                const editBtn = row.querySelector('button[onclick^="openEditModal"]');
+                if (editBtn) {
+                    const rfqTitle = document.getElementById('edit_rfq_title').textContent;
+                    editBtn.setAttribute('onclick', `openEditModal('${bidId}', '${rfqTitle.replace(/'/g, "\\'")}', ${formData.get('bid_price')}, ${formData.get('delivery_time_days')}, '${formData.get('incoterms')}')`);
+                }
+            }
+            closeEditModal();
+        } else {
+            throw new Error(data.error || 'Failed to update bid');
+        }
+    } catch (err) {
+        alert(err.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Save Changes';
+    }
+});
+
+async function submitWithdraw() {
+    const btn = document.getElementById('withdrawSubmitBtn');
+    const bidId = document.getElementById('withdraw_bid_id').value;
+    
+    btn.disabled = true;
+    btn.textContent = 'Withdrawing...';
+    
+    try {
+        const response = await fetch(`/api/bid/${bidId}`, {
+            method: 'DELETE'
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            const row = document.getElementById(`bid-row-${bidId}`);
+            if (row) {
+                row.remove();
+            }
+            closeWithdrawModal();
+            
+            // Check if table is empty now
+            const tbody = document.querySelector('tbody');
+            if (tbody && tbody.children.length === 0) {
+                location.reload(); // Reload to show empty state
+            }
+        } else {
+            throw new Error(data.error || 'Failed to withdraw bid');
+        }
+    } catch (err) {
+        alert(err.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Withdraw';
+    }
+}
+</script>
+{% endblock %}

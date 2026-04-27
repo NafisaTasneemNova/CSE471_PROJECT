@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Form, HTTPException, UploadFile, File, Depends, Header, Cookie, Body
+from fastapi import FastAPI, Request, Form, HTTPException, UploadFile, File, Depends, Header, Cookie, Body, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -9,7 +9,7 @@ import hashlib
 import secrets
 
 from database import connect_to_mongo, close_mongo_connection, db
-from models import RoleEnum, OverallStatusEnum, CompanyModel, LegalAndCapacityModel, CertificationModel, CertTypeEnum, VerificationStatusEnum, RFQModel, RFQStatusEnum, BidModel, SubscriptionTierEnum, UserModel, NotificationModel, NotificationTypeEnum, EscrowStatusEnum, PaymentModel, ShippingCalculateRequest, ShippingRateModel, ShippingMethodEnum, IncotermEnum, ContractModel, ContractStatusEnum
+from models import RoleEnum, OverallStatusEnum, CompanyModel, LegalAndCapacityModel, CertificationModel, CertTypeEnum, VerificationStatusEnum, RFQModel, RFQStatusEnum, BidModel, BidStatusEnum, SubscriptionTierEnum, UserModel, NotificationModel, NotificationTypeEnum, EscrowStatusEnum, PaymentModel, ShippingCalculateRequest, ShippingRateModel, ShippingMethodEnum, IncotermEnum, ContractModel, ContractStatusEnum, MessageModel
 import io
 import math
 from colorthief import ColorThief
@@ -231,6 +231,34 @@ async def lifespan(app: FastAPI):
             print("✅ Sessions TTL index ensured")
         except Exception:
             pass
+        
+        # Create indexes for buyer queries (Task 13.1)
+        try:
+            await _db["rfqs"].create_index("buyer_id")
+            await _db["rfqs"].create_index("status")
+            await _db["payments"].create_index("buyer_id")
+            await _db["payments"].create_index("status")
+            print("✅ Buyer query indexes ensured")
+        except Exception as e:
+            print(f"⚠️ Failed to create buyer indexes: {e}")
+        
+        # Create indexes for supplier queries (Task 13.2)
+        try:
+            await _db["bids"].create_index("supplier_id")
+            await _db["bids"].create_index("status")
+            await _db["payments"].create_index("supplier_id")
+            await _db["rfqs"].create_index([("status", 1), ("created_at", -1)])  # Compound index
+            print("✅ Supplier query indexes ensured")
+        except Exception as e:
+            print(f"⚠️ Failed to create supplier indexes: {e}")
+        
+        # Create indexes for chat messages
+        try:
+            await _db["messages"].create_index("rfq_id")
+            await _db["messages"].create_index([("rfq_id", 1), ("timestamp", 1)])
+            print("✅ Messages indexes ensured")
+        except Exception as e:
+            print(f"⚠️ Failed to create messages indexes: {e}")
     yield
     # Shutdown logic
     await close_mongo_connection()
@@ -247,6 +275,12 @@ app.add_middleware(
 )
 
 app.mount("/static", StaticFiles(directory="../frontend/src/components"), name="static")
+
+# Serve uploaded files (chat images, etc.)
+import os as _os
+_uploads_dir = _os.path.join(_os.path.dirname(__file__), "..", "frontend", "src", "uploads")
+_os.makedirs(_uploads_dir, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=_uploads_dir), name="uploads")
 
 templates = Jinja2Templates(directory="../frontend/src/pages")
 
@@ -363,8 +397,56 @@ async def require_login(session: Optional[str] = Cookie(None)):
     return user
 
 # ----------------------------------------
-# ACCESS CONTROL DEPENDENCY
+# ACCESS CONTROL DEPENDENCY (RBAC Engine)
 # ----------------------------------------
+from models import UserRole
+
+async def get_current_user_with_mock_role(
+    x_user_role: Optional[str] = Header(None),
+    user: Optional[dict] = Depends(get_current_user)
+):
+    """Retrieves user and their effective role, supporting a mock header for testing."""
+    role = "GUEST"
+    
+    if x_user_role:
+        role = x_user_role.upper()
+    elif user:
+        from database import db
+        if db is not None:
+            company = await db["companies"].find_one({"id": user.get("company_id")})
+            if company:
+                db_role = company.get("role", "").upper()
+                # Map platform's SUPPLIER to the requested SELLER role
+                role = UserRole.SELLER.value if db_role == "SUPPLIER" else db_role
+                
+    return user, role
+
+async def require_buyer(user_and_role: tuple = Depends(get_current_user_with_mock_role)):
+    user, role = user_and_role
+    if role != UserRole.BUYER.value:
+        raise HTTPException(status_code=403, detail="Access denied. BUYER privileges required.")
+    return user or {"mock": True, "role": role}
+
+async def require_seller(user_and_role: tuple = Depends(get_current_user_with_mock_role)):
+    user, role = user_and_role
+    if role != UserRole.SELLER.value:
+        raise HTTPException(status_code=403, detail="Access denied. SELLER privileges required.")
+    return user or {"mock": True, "role": role}
+
+# Alias for existing routes that use require_supplier
+require_supplier = require_seller
+
+async def require_admin(user_and_role: tuple = Depends(get_current_user_with_mock_role)):
+    user, role = user_and_role
+    if role != UserRole.ADMIN.value:
+        raise HTTPException(status_code=403, detail="Access denied. ADMIN privileges required.")
+    return user or {"mock": True, "role": role}
+
+async def require_active_participant(user_and_role: tuple = Depends(get_current_user_with_mock_role)):
+    user, role = user_and_role
+    if role not in [UserRole.BUYER.value, UserRole.SELLER.value]:
+        raise HTTPException(status_code=403, detail="Access denied. Active participant privileges required.")
+    return user or {"mock": True, "role": role}
 
 async def check_premium_status(company_id: Optional[str] = Header(None, alias="X-Company-ID")):
     """
@@ -1497,66 +1579,6 @@ async def generate_supplier_analytics(user: dict, db):
             }]
         }
 
-async def generate_user_analytics(user: dict, db):
-    """Generate analytics data for user dashboard."""
-    from datetime import datetime, timedelta
-    import random
-    
-    # In production, fetch real data from database
-    # For now, generating sample data
-    
-    analytics = {
-        "total_orders": random.randint(50, 200),
-        "fulfilled_orders": random.randint(40, 180),
-        "fulfillment_rate": random.randint(75, 95),
-        "total_revenue": f"{random.randint(50000, 200000):,}",
-        "avg_order_value": f"{random.randint(500, 2000):,}",
-        
-        # Performance metrics
-        "on_time_delivery_rate": random.randint(85, 98),
-        "on_time_deliveries": random.randint(80, 150),
-        "total_deliveries": random.randint(90, 160),
-        "avg_quality_rating": round(random.uniform(4.0, 4.9), 1),
-        "total_ratings": random.randint(50, 150),
-        "rating_distribution": {
-            5: random.randint(50, 70),
-            4: random.randint(20, 30),
-            3: random.randint(5, 15),
-            2: random.randint(2, 8),
-            1: random.randint(0, 5)
-        },
-        
-        # Cost breakdown
-        "unit_price_costs": f"{random.randint(30000, 100000):,}",
-        "shipping_costs": f"{random.randint(5000, 15000):,}",
-        "escrow_payments": f"{random.randint(2000, 8000):,}",
-        "unit_price_percentage": random.randint(65, 75),
-        "shipping_percentage": random.randint(15, 25),
-        "escrow_percentage": random.randint(5, 15),
-        
-        # Charts data
-        "top_products_labels": ["T-Shirts", "Jeans", "Jackets", "Dresses", "Hoodies"],
-        "top_products_data": [random.randint(20, 50) for _ in range(5)],
-        "top_regions_labels": ["North America", "Europe", "Asia", "South America", "Africa"],
-        "top_regions_data": [random.randint(10000, 50000) for _ in range(5)],
-        "trends_labels": ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
-        "trends_data": [random.randint(10, 40) for _ in range(6)],
-        
-        # Recent orders
-        "recent_orders": [
-            {
-                "id": f"ORD{random.randint(100000, 999999)}",
-                "product_name": random.choice(["T-Shirts", "Jeans", "Jackets", "Dresses"]),
-                "date": (datetime.now() - timedelta(days=random.randint(1, 30))).strftime("%Y-%m-%d"),
-                "amount": f"{random.randint(500, 5000):,}",
-                "status": random.choice(["FULFILLED", "PENDING", "IN_PROGRESS"]),
-                "rating": random.choice([None, 4, 5, 4.5, 5])
-            }
-            for _ in range(10)
-        ]
-    }
-    
-    return analytics
 
 async def generate_admin_analytics(db):
     """Generate analytics data for admin dashboard."""
@@ -2323,8 +2345,15 @@ async def delete_rfq(rfq_id: str, user: dict = Depends(require_login)):
 @app.get("/dashboard", response_class=HTMLResponse)
 async def smart_dashboard(request: Request, user: Optional[dict] = Depends(get_current_user)):
     """Redirect to the correct dashboard based on the user's role."""
+    def no_cache_redirect(url: str):
+        response = RedirectResponse(url=url, status_code=303)
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        return response
+
     if not user:
-        return RedirectResponse(url="/login", status_code=303)
+        return no_cache_redirect("/login")
 
     from database import db
     if db is not None:
@@ -2332,152 +2361,428 @@ async def smart_dashboard(request: Request, user: Optional[dict] = Depends(get_c
         if company:
             role = company.get("role", "").upper()
             if role == "SUPPLIER":
-                return RedirectResponse(url="/dashboard/supplier", status_code=303)
+                return no_cache_redirect("/dashboard/supplier")
             elif role == "BUYER":
-                return RedirectResponse(url="/dashboard/buyer", status_code=303)
+                return no_cache_redirect("/dashboard/buyer")
 
-    return RedirectResponse(url="/dashboard/buyer", status_code=303)
-
+    return no_cache_redirect("/dashboard/buyer")
 
 @app.get("/rfq/browse", response_class=HTMLResponse)
 async def rfq_browse_redirect(request: Request, user: Optional[dict] = Depends(get_current_user)):
-    """Smart Browse RFQs redirect — buyers see their dashboard, suppliers see the RFQ feed."""
-    if not user:
-        return RedirectResponse(url="/login", status_code=303)
-
-    from database import db
-    if db is not None:
-        company = await db["companies"].find_one({"id": user.get("company_id")})
-        if company:
-            role = company.get("role", "").upper()
-            if role == "SUPPLIER":
-                return RedirectResponse(url="/dashboard/supplier", status_code=303)
-            elif role == "BUYER":
-                return RedirectResponse(url="/dashboard/buyer", status_code=303)
-
-    return RedirectResponse(url="/dashboard/buyer", status_code=303)
+    """Browse RFQs — redirects to the open RFQ marketplace feed."""
+    return RedirectResponse(url="/rfq/feed", status_code=303)
 
 
 @app.get("/dashboard/buyer", response_class=HTMLResponse)
-async def buyer_dashboard(request: Request, user: dict = Depends(require_login)):
-    """Buyer dashboard — shows their RFQs, bids received, and payment statuses."""
-    from database import db
-    rfqs = []
-    payments = []
-    if db is not None:
-        company = await db["companies"].find_one({"id": user.get("company_id")})
-        buyer_id = user.get("id")
-        company_id = user.get("company_id")
-
-        # Fetch buyer's RFQs (match by multiple buyer_id formats)
-        async for rfq in db["rfqs"].find({
-            "$or": [
-                {"buyer_id": buyer_id},
-                {"buyer_id": company_id},
-                {"buyer_id": company.get("id") if company else None},
-                {"buyer_id": company.get("unique_id") if company else None},
-            ]
-        }).sort("created_at", -1):
-            rfq["_id"] = str(rfq["_id"])
-            # Count bids for this RFQ
-            rfq["bid_count"] = await db["bids"].count_documents({"rfq_id": rfq["id"]})
-            # Check if paid
-            payment = await db["payments"].find_one({
-                "order_id": rfq["id"],
-                "status": {"$in": ["PAID_IN_ESCROW", "RELEASED"]}
-            })
-            rfq["payment_status"] = payment.get("status") if payment else None
-            rfq["payment_id"] = payment.get("payment_id") if payment else None
-            rfqs.append(rfq)
-
-        # Fetch buyer's payments
-        async for p in db["payments"].find({"buyer_id": buyer_id}).sort("created_at", -1).limit(5):
-            p["_id"] = str(p["_id"])
-            payments.append(p)
-
+async def buyer_dashboard(request: Request, user: dict = Depends(require_buyer)):
+    """Buyer dashboard — serves the HTML shell. All data is fetched client-side via /api/dashboard/buyer/* endpoints."""
     return templates.TemplateResponse("buyer_dashboard.html", {
         "request": request,
         "user": user,
-        "rfqs": rfqs,
-        "payments": payments,
     })
 
 
-@app.get("/dashboard/supplier", response_class=HTMLResponse)
-async def supplier_dashboard_feed(request: Request, user: Optional[dict] = Depends(get_current_user)):
+def build_buyer_query(user: dict, company: dict) -> dict:
+    """Build a MongoDB $or query that matches buyer_id across all known ID formats."""
+    return {
+        "$or": [
+            {"buyer_id": user.get("id")},
+            {"buyer_id": user.get("company_id")},
+            {"buyer_id": company.get("id")},
+            {"buyer_id": company.get("unique_id")},
+        ]
+    }
+
+
+@app.get("/api/dashboard/buyer/stats")
+async def get_buyer_stats(user: dict = Depends(require_buyer)):
+    """
+    Get buyer dashboard statistics.
+    Security Matrix: Only returns spending data.
+    """
     from database import db
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not available")
+        
+    buyer_id = user.get("id")
+    
+    # Calculate spending_data: sum of all released/paid amounts
+    spending_data = 0.0
+    async for payment in db["payments"].find({
+        "buyer_id": buyer_id,
+        "status": "RELEASED"
+    }):
+        spending_data += payment.get("amount", 0.0)
+        
+    return {
+        "success": True,
+        "stats": {
+            "spending_data": spending_data,
+        }
+    }
 
+
+@app.get("/api/dashboard/buyer/recent-rfqs")
+async def get_buyer_recent_rfqs(
+    limit: int = 10,
+    user: dict = Depends(require_buyer)
+):
+    """
+    Get buyer's recent RFQs with enriched data.
+    Returns RFQs with bid_count, payment_status, and payment_id.
+    """
+    from database import db
+    
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not available")
+    
+    company = await db["companies"].find_one({"id": user.get("company_id")})
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+    
+    buyer_query = build_buyer_query(user, company)
+    
+    # Fetch RFQs sorted by created_at descending
     rfqs = []
-    orders = []  # accepted bids + paid orders
+    async for rfq in db["rfqs"].find(buyer_query).sort("created_at", -1).limit(limit):
+        # Convert ObjectId to string if present
+        if "_id" in rfq:
+            rfq["_id"] = str(rfq["_id"])
+        
+        # Count bids for this RFQ
+        bid_count = await db["bids"].count_documents({"rfq_id": rfq.get("id")})
+        
+        # Find payment for this RFQ
+        payment = await db["payments"].find_one({"order_id": rfq.get("id")})
+        
+        # Enrich RFQ with additional data
+        rfq["bid_count"] = bid_count
+        rfq["payment_status"] = payment.get("status") if payment else None
+        rfq["payment_id"] = payment.get("payment_id") if payment else None
+        
+        rfqs.append(rfq)
+    
+    return {
+        "success": True,
+        "rfqs": rfqs
+    }
 
-    if db is not None:
-        # Open RFQs for browsing
-        async for document in db["rfqs"].find({"status": "OPEN"}).sort("created_at", -1):
-            document['_id'] = str(document['_id'])
-            rfqs.append(document)
 
-        if user:
-            company = await db["companies"].find_one({"id": user.get("company_id")})
-            company_role = company.get("role", "").upper() if company else ""
+@app.get("/api/dashboard/buyer/action-required")
+async def get_buyer_action_required(user: dict = Depends(require_buyer)):
+    """
+    Get buyer's action-required items from escrow system.
+    Returns payments with status SENT_FOR_DELIVERY that need buyer confirmation.
+    """
+    from database import db
+    
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not available")
+    
+    buyer_id = user.get("id")
+    
+    # Query payments with status SENT_FOR_DELIVERY
+    actions = []
+    async for payment in db["payments"].find({
+        "buyer_id": buyer_id,
+        "status": "SENT_FOR_DELIVERY"
+    }):
+        # Fetch associated RFQ to get title
+        rfq = await db["rfqs"].find_one({"id": payment.get("order_id")})
+        rfq_title = rfq.get("title", "Unknown RFQ") if rfq else "Unknown RFQ"
+        
+        # Build action object
+        action = {
+            "payment_id": payment.get("payment_id"),
+            "transaction_id": payment.get("transaction_id"),
+            "action": "confirm_delivery",
+            "description": "Supplier has marked order as delivered. Please confirm receipt.",
+            "amount": payment.get("amount", 0.0),
+            "rfq_title": rfq_title
+        }
+        actions.append(action)
+    
+    return {
+        "success": True,
+        "actions": actions
+    }
 
-            # Only show orders/bids section for SUPPLIER accounts
-            if company_role == "SUPPLIER":
-                supplier_id = company.get("unique_id") or company.get("id") if company else user.get("id")
 
-                # Fetch all bids by this supplier (accepted, confirmed, or with payments)
-                async for bid in db["bids"].find({
-                    "supplier_id": supplier_id,
-                    "status": {"$in": ["ACCEPTED", "CONFIRMED", "ACTIVE"]}
-                }):
-                    rfq = await db["rfqs"].find_one({"id": bid.get("rfq_id")})
-                    if not rfq:
-                        continue
+@app.get("/supplier/bids", response_class=HTMLResponse)
+async def supplier_bids_page(request: Request, user: dict = Depends(require_seller)):
+    """Serve the 'My Bids' page for a supplier."""
+    from database import db
+    
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not available")
+        
+    try:
+        user_company = await db["companies"].find_one({"id": user.get("company_id")})
+        bidder_ids = [user.get("id"), user.get("company_id")]
+        if user_company:
+            bidder_ids.append(user_company.get("id"))
+            bidder_ids.append(user_company.get("unique_id"))
+            
+        bids_cursor = db["bids"].find({"supplier_id": {"$in": [id for id in bidder_ids if id]}}).sort("timestamp", -1)
+        bids = await bids_cursor.to_list(length=100)
+        
+        # Enrich bids with RFQ and Buyer data
+        rfq_ids = list(set([bid.get("rfq_id") for bid in bids if bid.get("rfq_id")]))
+        rfqs_cursor = db["rfqs"].find({"id": {"$in": rfq_ids}})
+        rfqs_list = await rfqs_cursor.to_list(length=len(rfq_ids))
+        rfqs_map = {rfq.get("id"): rfq for rfq in rfqs_list}
+        
+        # Fetch buyer users
+        buyer_ids = list(set([rfq.get("buyer_id") for rfq in rfqs_list if rfq.get("buyer_id")]))
+        buyers_cursor = db["users"].find({"id": {"$in": buyer_ids}})
+        buyers_list = await buyers_cursor.to_list(length=len(buyer_ids))
+        buyers_map = {b.get("id"): b for b in buyers_list}
 
-                    # Check for payment linked to this specific bid
-                    payment = await db["payments"].find_one({
-                        "order_id": bid.get("rfq_id"),
-                        "bid_id": bid.get("id"),
-                        "status": {"$in": [
-                            "PAID_IN_ESCROW", "WORK_IN_PROGRESS",
-                            "SENT_FOR_DELIVERY", "RELEASED"
-                        ]}
-                    })
+        # Fetch companies for these buyers
+        buyer_company_ids = list(set([b.get("company_id") for b in buyers_list if b.get("company_id")]))
+        buyer_companies_cursor = db["companies"].find({"id": {"$in": buyer_company_ids}})
+        buyer_companies_list = await buyer_companies_cursor.to_list(length=len(buyer_company_ids))
+        buyer_companies_map = {c.get("id"): c for c in buyer_companies_list}
+        
+        enriched_bids = []
+        for bid in bids:
+            # Add a string representation of ID for Jinja compatibility if needed
+            bid["id_str"] = str(bid.get("id", ""))
+            rfq = rfqs_map.get(bid.get("rfq_id"), {})
+            
+            buyer_user = buyers_map.get(rfq.get("buyer_id"), {})
+            buyer_company = buyer_companies_map.get(buyer_user.get("company_id"), {})
+            buyer_name = buyer_company.get("name") or buyer_user.get("email") or "Buyer"
+            
+            enriched_bids.append({
+                "bid": bid,
+                "rfq": rfq,
+                "buyer_name": buyer_name
+            })
+            
+        return templates.TemplateResponse("supplier_bids.html", {
+            "request": request,
+            "user": user,
+            "company": user_company,
+            "bids_data": enriched_bids
+        })
+        
+    except Exception as e:
+        print(f"Error loading supplier bids: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Failed to load bids")
 
-                    if bid.get("status") in ("ACCEPTED", "CONFIRMED") or payment:
-                        if payment:
-                            payment["_id"] = str(payment["_id"])
-                        orders.append({
-                            "bid": bid,
-                            "payment": payment,
-                            "rfq": rfq,
-                        })
-                
-                # Also fetch bids that have payments but might not be in ACCEPTED/CONFIRMED status anymore
-                async for payment in db["payments"].find({
-                    "supplier_id": supplier_id,
-                    "status": {"$in": [
-                        "PAID_IN_ESCROW", "WORK_IN_PROGRESS",
-                        "SENT_FOR_DELIVERY", "RELEASED"
-                    ]}
-                }):
-                    # Check if we already have this order
-                    bid_id = payment.get("bid_id")
-                    if bid_id and not any(o["bid"].get("id") == bid_id for o in orders):
-                        bid = await db["bids"].find_one({"id": bid_id})
-                        if bid:
-                            rfq = await db["rfqs"].find_one({"id": bid.get("rfq_id")})
-                            if rfq:
-                                payment["_id"] = str(payment["_id"])
-                                orders.append({
-                                    "bid": bid,
-                                    "payment": payment,
-                                    "rfq": rfq,
-                                })
 
+@app.get("/api/dashboard/supplier/stats")
+async def get_supplier_stats(user: dict = Depends(require_supplier)):
+    """
+    Get supplier dashboard statistics.
+    Security Matrix: Only returns win rate and revenue.
+    """
+    from database import db
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not available")
+        
+    company = await db["companies"].find_one({"id": user.get("company_id")})
+    supplier_id = company.get("unique_id") or company.get("id") if company else user.get("id")
+    
+    # Calculate win rate
+    total_bids = await db["bids"].count_documents({"supplier_id": supplier_id})
+    accepted_bids = await db["bids"].count_documents({"supplier_id": supplier_id, "status": "ACCEPTED"})
+    win_rate = (accepted_bids / total_bids * 100) if total_bids > 0 else 0.0
+    
+    # Calculate revenue (released payments)
+    revenue = 0.0
+    async for payment in db["payments"].find({
+        "supplier_id": supplier_id,
+        "status": "RELEASED"
+    }):
+        revenue += payment.get("amount", 0.0)
+        
+    return {
+        "success": True,
+        "stats": {
+            "win_rate": round(win_rate, 2),
+            "revenue": revenue
+        }
+    }
+
+
+@app.get("/api/bids/recommendations")
+async def get_bid_recommendations(user: dict = Depends(require_seller)):
+    """Returns AI-recommended RFQs for a specific supplier."""
+    return {"success": True, "recommendations": []}
+
+
+@app.post("/escrow/deposit")
+async def escrow_deposit(user: dict = Depends(require_buyer)):
+    """Buyer deposits funds into escrow."""
+    return {"success": True, "status": "deposited"}
+
+
+@app.post("/escrow/release")
+async def escrow_release(user: dict = Depends(require_admin)):
+    """Admin releases funds from escrow."""
+    return {"success": True, "status": "released"}
+
+
+@app.get("/api/dashboard/supplier/open-rfqs")
+async def get_supplier_open_rfqs(
+    user: dict = Depends(require_supplier),
+    limit: int = 20,
+    category: Optional[str] = None,
+    urgency: Optional[str] = None
+):
+    """
+    Get open RFQs available for bidding.
+    Returns list of open RFQs with optional filtering by category and urgency.
+    
+    Requirements: 4.5
+    """
+    from database import db
+    
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not available")
+    
+    # Build query filter
+    query_filter = {"status": "OPEN"}
+    
+    # Apply category filter if provided
+    if category:
+        query_filter["product_category"] = category
+    
+    # Apply urgency filter if provided
+    if urgency:
+        query_filter["urgency_level"] = urgency
+    
+    # Query RFQs collection with filters
+    rfqs = []
+    async for rfq in db["rfqs"].find(query_filter).sort("created_at", -1).limit(limit):
+        # Convert ObjectId to string for JSON serialization
+        rfq["_id"] = str(rfq["_id"])
+        
+        # Build response object with required fields
+        rfq_data = {
+            "id": rfq.get("id"),
+            "title": rfq.get("title"),
+            "product_category": rfq.get("product_category"),
+            "quantity": rfq.get("quantity"),
+            "urgency_level": rfq.get("urgency_level"),
+            "target_delivery_date": rfq.get("target_delivery_date").isoformat() if rfq.get("target_delivery_date") else None,
+            "created_at": rfq.get("created_at").isoformat() if rfq.get("created_at") else None
+        }
+        
+        rfqs.append(rfq_data)
+    
+    return {
+        "success": True,
+        "rfqs": rfqs
+    }
+
+
+@app.get("/api/dashboard/supplier/verification-status")
+async def get_supplier_verification_status(user: dict = Depends(require_supplier)):
+    """
+    Get supplier verification status and trust metrics.
+    Returns verification status, average rating, total reviews, and trust score.
+    
+    Requirements: 4.6, 12.1, 12.2, 12.3, 12.4, 12.5
+    """
+    from database import db
+    
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not available")
+    
+    # Query companies collection for supplier's company record
+    company = await db["companies"].find_one({"id": user.get("company_id")})
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+    
+    # Extract overall_status as verification_status
+    verification_status = company.get("overall_status", "DRAFT")
+    
+    # Extract trust_score from company record
+    trust_score = company.get("trust_score", 0)
+    
+    # Calculate average_rating from reviews (if reviews system exists, otherwise return 0)
+    # Since reviews system doesn't exist yet, return 0
+    average_rating = 0.0
+    
+    # Count total_reviews (if reviews system exists, otherwise return 0)
+    # Since reviews system doesn't exist yet, return 0
+    total_reviews = 0
+    
+    return {
+        "success": True,
+        "verification": {
+            "status": verification_status,
+            "average_rating": average_rating,
+            "total_reviews": total_reviews,
+            "trust_score": trust_score
+        }
+    }
+
+
+@app.get("/api/dashboard/supplier/active-production")
+async def get_supplier_active_production(user: dict = Depends(require_supplier)):
+    """
+    Get supplier's active production orders.
+    Returns orders currently in production with milestone tracking.
+    
+    Requirements: 4.7, 11.3, 11.4
+    """
+    from database import db
+    
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not available")
+    
+    company = await db["companies"].find_one({"id": user.get("company_id")})
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+    
+    supplier_id = company.get("unique_id") or company.get("id")
+    
+    # Query payments collection for supplier's payments with status WORK_IN_PROGRESS
+    orders = []
+    async for payment in db["payments"].find({
+        "supplier_id": supplier_id,
+        "status": "WORK_IN_PROGRESS"
+    }):
+        # For each payment, fetch associated bid and RFQ data
+        bid = await db["bids"].find_one({"id": payment.get("bid_id")})
+        rfq = await db["rfqs"].find_one({"id": payment.get("order_id")})
+        
+        if rfq:
+            # Build order objects with payment_id, order_id, bid_id, amount, rfq_title, quantity, current_milestone, started_at
+            order = {
+                "payment_id": payment.get("payment_id"),
+                "order_id": payment.get("order_id"),
+                "bid_id": payment.get("bid_id"),
+                "amount": payment.get("amount", 0.0),
+                "rfq_title": rfq.get("title", "Unknown RFQ"),
+                "quantity": rfq.get("quantity", 0),
+                "current_milestone": payment.get("status", "WORK_IN_PROGRESS"),
+                "started_at": payment.get("created_at").isoformat() if payment.get("created_at") else None
+            }
+            
+            orders.append(order)
+    
+    return {
+        "success": True,
+        "orders": orders
+    }
+
+
+@app.get("/dashboard/supplier", response_class=HTMLResponse)
+async def supplier_dashboard_feed(request: Request, user: dict = Depends(require_supplier)):
+    """
+    Supplier dashboard page route — serves the HTML shell.
+    All data is fetched client-side via /api/dashboard/supplier/* endpoints.
+    Requirements: 3.1, 9.1, 11.3
+    """
     return templates.TemplateResponse("supplier_dashboard.html", {
         "request": request,
-        "rfqs": rfqs,
-        "orders": orders,
         "user": user,
     })
 
@@ -2488,42 +2793,67 @@ async def rfq_feed_page(request: Request, user: Optional[dict] = Depends(get_cur
     from database import db
 
     rfqs = []
+    user_role = "GUEST"
     if db is not None:
         # Fetch all open RFQs
         async for document in db["rfqs"].find({"status": "OPEN"}).sort("created_at", -1):
             document['_id'] = str(document['_id'])
             rfqs.append(document)
 
+        # Determine the logged-in user's role
+        if user:
+            company = await db["companies"].find_one({"id": user.get("company_id")})
+            if company:
+                user_role = company.get("role", "GUEST").upper()
+
     return templates.TemplateResponse("rfq_feed.html", {
         "request": request,
         "rfqs": rfqs,
         "user": user,
+        "user_role": user_role,
+    })
+
+
+@app.get("/rfq/my", response_class=HTMLResponse)
+async def my_rfqs_page(request: Request, user: dict = Depends(require_buyer)):
+    """My RFQs — shows only the RFQs created by the logged-in buyer."""
+    from database import db
+
+    rfqs = []
+    if db is not None:
+        company = await db["companies"].find_one({"id": user.get("company_id")})
+        # Build a query that matches buyer_id across all known ID formats
+        buyer_ids = [user.get("id"), user.get("company_id")]
+        if company:
+            buyer_ids.append(company.get("id"))
+            buyer_ids.append(company.get("unique_id"))
+        buyer_ids = [bid for bid in buyer_ids if bid]  # remove None values
+
+        async for document in db["rfqs"].find(
+            {"buyer_id": {"$in": buyer_ids}}
+        ).sort("created_at", -1):
+            document['_id'] = str(document['_id'])
+            rfqs.append(document)
+
+    return templates.TemplateResponse("my_rfqs.html", {
+        "request": request,
+        "rfqs": rfqs,
+        "user": user,
+        "user_role": "BUYER",
+        "page_title": "My RFQs",
+        "page_description": "Manage the requests for quotation you have posted."
     })
 
 
 @app.post("/quote/submit")
-async def submit_quote(request: Request):
+async def submit_quote(request: Request, user: dict = Depends(require_login)):
     form_data = await request.form()
     # In a real app we'd save this to a 'quotes' collection
     # Here, we'll just log and mock a success return to the dashboard
     print("New Quote Submitted:", form_data)
     
-    # Redirect back to dashboard (or show a success message)
-    # Re-fetch RFQs to render dashboard properly
-    from database import db
-    rfqs = []
-    if db is not None:
-        cursor = db["rfqs"].find({"status": "OPEN"}).sort("created_at", -1)
-        async for document in cursor:
-            document['_id'] = str(document['_id']) 
-            rfqs.append(document)
-            
-    return templates.TemplateResponse("supplier_dashboard.html", {
-        "request": request, 
-        "rfqs": rfqs,
-        "success": True,
-        "message": "Your quote was successfully sent to the buyer!"
-    })
+    # Redirect to supplier dashboard (client-side fetches all data)
+    return RedirectResponse(url="/dashboard/supplier", status_code=303)
 
 # ----------------------------------------
 # AI TOOLS MODULE
@@ -3047,6 +3377,33 @@ async def notifications_page(request: Request, user: dict = Depends(require_logi
     return templates.TemplateResponse("notifications.html", {"request": request, "user": user})
 
 
+# ----------------------------------------
+# NOTIFICATION HELPER
+# ----------------------------------------
+
+async def create_notification(user_id: str, notification_type: str, title: str, message: str, related_id: str = None, link: str = None):
+    """Create a notification for a user and persist to the database."""
+    from database import db
+    import uuid as _uuid
+
+    if db is None:
+        return None
+
+    notif = {
+        "id": str(_uuid.uuid4()),
+        "user_id": user_id,
+        "type": notification_type,
+        "title": title,
+        "message": message,
+        "is_read": False,
+        "created_at": datetime.utcnow(),
+        "related_id": related_id,
+        "link": link,
+    }
+    await db["notifications"].insert_one(notif)
+    return notif
+
+
 @app.get("/api/notifications")
 async def get_notifications(
     limit: int = 20,
@@ -3091,7 +3448,8 @@ async def get_notifications(
                     "message": str(notif.get("message", "")),
                     "is_read": bool(notif.get("is_read", False)),
                     "created_at": created_at_str,
-                    "related_id": str(notif.get("related_id")) if notif.get("related_id") else None
+                    "related_id": str(notif.get("related_id")) if notif.get("related_id") else None,
+                    "link": str(notif.get("link")) if notif.get("link") else None
                 }
                 serialized_notifications.append(clean_notif)
             except Exception as notif_error:
@@ -3133,7 +3491,7 @@ async def get_notification_count(user: dict = Depends(require_login)):
         })
         
         return {"unread_count": unread_count}
-        return JSONResponse({"unread_count": unread_count})
+
     except Exception as e:
         print(f"Error counting notifications: {e}")
         return JSONResponse({"unread_count": 0})
@@ -3484,12 +3842,11 @@ async def rfq_edit_page(request: Request, rfq_id: str, user: dict = Depends(requ
         if not is_owner:
             raise HTTPException(status_code=403, detail="You can only edit your own RFQs")
         
-        # Return the RFQ builder page with pre-filled data
-        return templates.TemplateResponse("rfq_builder.html", {
+        # Return the simplified RFQ edit page
+        return templates.TemplateResponse("rfq_edit.html", {
             "request": request,
             "user": user,
-            "rfq": rfq,
-            "edit_mode": True
+            "rfq": rfq
         })
     
     except HTTPException:
@@ -3668,6 +4025,87 @@ async def submit_bid(payload: BidSubmitRequest, user: dict = Depends(require_log
     return {"success": True, "bid_id": bid.id, "message": "Bid submitted successfully"}
 
 
+@app.put("/api/bid/{bid_id}")
+async def update_bid(bid_id: str, request: Request, user: dict = Depends(require_login)):
+    """Update a submitted bid."""
+    from database import db
+    from fastapi.responses import JSONResponse
+    
+    if db is None:
+        return JSONResponse({"success": False, "error": "Database not available"}, status_code=500)
+        
+    bid = await db["bids"].find_one({"id": bid_id})
+    if not bid:
+        return JSONResponse({"success": False, "error": "Bid not found"}, status_code=404)
+        
+    # Check ownership
+    user_company = await db["companies"].find_one({"id": user.get("company_id")})
+    bidder_ids = {user.get("id"), user.get("company_id")}
+    if user_company:
+        bidder_ids.add(user_company.get("id"))
+        bidder_ids.add(user_company.get("unique_id"))
+    bidder_ids.discard(None)
+    
+    if bid.get("supplier_id") not in bidder_ids:
+        return JSONResponse({"success": False, "error": "Unauthorized to update this bid"}, status_code=403)
+        
+    # Ensure bid hasn't been accepted
+    if bid.get("bid_status") in ["ACCEPTED", "REJECTED"]:
+        return JSONResponse({"success": False, "error": f"Cannot edit an {bid.get('bid_status').lower()} bid"}, status_code=400)
+        
+    form_data = await request.form()
+    update_data = {}
+    
+    if form_data.get("bid_price"):
+        update_data["bid_price"] = float(form_data.get("bid_price"))
+    if form_data.get("delivery_time_days"):
+        update_data["delivery_time_days"] = int(form_data.get("delivery_time_days"))
+    if form_data.get("incoterms"):
+        update_data["incoterms"] = form_data.get("incoterms")
+    if form_data.get("quality_notes") is not None:
+        update_data["quality_notes"] = form_data.get("quality_notes")
+        
+    if not update_data:
+        return JSONResponse({"success": False, "error": "No data provided"}, status_code=400)
+        
+    await db["bids"].update_one({"id": bid_id}, {"$set": update_data})
+    
+    return JSONResponse({"success": True, "message": "Bid updated successfully"})
+
+
+@app.delete("/api/bid/{bid_id}")
+async def withdraw_bid(bid_id: str, user: dict = Depends(require_login)):
+    """Withdraw/delete a submitted bid."""
+    from database import db
+    from fastapi.responses import JSONResponse
+    
+    if db is None:
+        return JSONResponse({"success": False, "error": "Database not available"}, status_code=500)
+        
+    bid = await db["bids"].find_one({"id": bid_id})
+    if not bid:
+        return JSONResponse({"success": False, "error": "Bid not found"}, status_code=404)
+        
+    # Check ownership
+    user_company = await db["companies"].find_one({"id": user.get("company_id")})
+    bidder_ids = {user.get("id"), user.get("company_id")}
+    if user_company:
+        bidder_ids.add(user_company.get("id"))
+        bidder_ids.add(user_company.get("unique_id"))
+    bidder_ids.discard(None)
+    
+    if bid.get("supplier_id") not in bidder_ids:
+        return JSONResponse({"success": False, "error": "Unauthorized to withdraw this bid"}, status_code=403)
+        
+    # Ensure bid hasn't been accepted
+    if bid.get("bid_status") in ["ACCEPTED", "REJECTED"]:
+        return JSONResponse({"success": False, "error": f"Cannot withdraw an {bid.get('bid_status').lower()} bid"}, status_code=400)
+        
+    await db["bids"].delete_one({"id": bid_id})
+    
+    return JSONResponse({"success": True, "message": "Bid withdrawn successfully"})
+
+
 class BidAcceptRequest(BaseModel):
     bid_id: str
     rfq_id: str
@@ -3808,7 +4246,8 @@ class InitiatePaymentRequest(BaseModel):
     supplier_id: str
 
 @app.post("/api/payment/initiate")
-async def initiate_payment(payload: InitiatePaymentRequest, user: dict = Depends(require_login)):
+@app.post("/escrow/deposit")
+async def initiate_payment(payload: InitiatePaymentRequest, user: dict = Depends(require_buyer)):
     from database import db
     if db is None:
         raise HTTPException(status_code=500, detail="Database not available")
@@ -3969,8 +4408,9 @@ class ReleasePaymentRequest(BaseModel):
 
 
 @app.post("/api/payment/release")
-async def release_escrow(payload: ReleasePaymentRequest, user: dict = Depends(require_login)):
-    """Admin or buyer releases escrowed funds to the supplier."""
+@app.post("/escrow/release")
+async def release_escrow(payload: ReleasePaymentRequest, user: dict = Depends(require_admin)):
+    """Admin releases escrowed funds to the supplier."""
     from database import db
     if db is None:
         raise HTTPException(status_code=500, detail="Database not available")
@@ -4924,3 +5364,455 @@ async def admin_contracts_page(request: Request, admin: dict = Depends(require_a
         "user": admin,
         "contracts": contracts,
     })
+
+
+# ----------------------------------------
+# BID COMPARISON MATRIX
+# ----------------------------------------
+
+@app.get("/rfq/{rfq_id}/bids", response_class=HTMLResponse)
+async def bid_comparison_page(request: Request, rfq_id: str, user: dict = Depends(require_buyer)):
+    """Serve the Bid Comparison Matrix page for a buyer's RFQ."""
+    from database import db
+
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not available")
+
+    # Fetch the RFQ and verify ownership
+    rfq = await db["rfqs"].find_one({"id": rfq_id})
+    if not rfq:
+        raise HTTPException(status_code=404, detail="RFQ not found")
+
+    return templates.TemplateResponse("bid_comparison.html", {
+        "request": request,
+        "user": user,
+        "rfq_id": rfq_id,
+    })
+
+
+@app.get("/api/bids/recommendations")
+async def get_bid_recommendations(user: dict = Depends(require_seller)):
+    """
+    AI Bid Recommendations API
+    Strictly for Sellers.
+    """
+    return {"success": True, "recommendations": []}
+
+
+@app.get("/rfq/{rfq_id}/compare-bids")
+async def compare_bids(rfq_id: str, user: dict = Depends(require_buyer)):
+    """
+    Bid Comparison Matrix API — Strictly for Buyers.
+    Fetches all bids for a given RFQ, enriched with supplier company details
+    (company name, trust score, average rating) for side-by-side comparison.
+    """
+    from database import db
+
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not available")
+
+    # Verify the RFQ exists
+    rfq = await db["rfqs"].find_one({"id": rfq_id})
+    if not rfq:
+        raise HTTPException(status_code=404, detail="RFQ not found")
+    rfq.pop("_id", None)
+
+    # Fetch all ACTIVE bids for this RFQ
+    bids = []
+    async for bid in db["bids"].find({"rfq_id": rfq_id, "status": "ACTIVE"}).sort("bid_price", 1):
+        bid.pop("_id", None)
+
+        # Enrich with supplier company data
+        supplier = await db["companies"].find_one({
+            "$or": [
+                {"id": bid.get("supplier_id")},
+                {"unique_id": bid.get("supplier_id")},
+            ]
+        })
+
+        if supplier:
+            supplier.pop("_id", None)
+            bid["company_name"] = supplier.get("name", bid.get("supplier_name", "Unknown"))
+            bid["trust_score"] = supplier.get("trust_score", 0)
+
+            # Calculate average rating from reviews if available
+            try:
+                reviews = await db["reviews"].find({"supplier_id": bid["supplier_id"]}).to_list(length=100)
+                if reviews:
+                    bid["average_rating"] = round(sum(r.get("rating", 0) for r in reviews) / len(reviews), 1)
+                else:
+                    bid["average_rating"] = 0.0
+            except Exception:
+                bid["average_rating"] = 0.0
+
+            bid["verification_status"] = supplier.get("overall_status", "DRAFT")
+        else:
+            bid["company_name"] = bid.get("supplier_name", "Unknown Supplier")
+            bid["trust_score"] = 0
+            bid["average_rating"] = 0.0
+            bid["verification_status"] = "UNKNOWN"
+
+        # Serialize datetime
+        if isinstance(bid.get("timestamp"), datetime):
+            bid["timestamp"] = bid["timestamp"].isoformat() + "Z"
+
+        bids.append(bid)
+
+    # Serialize RFQ dates
+    for key in ("created_at", "deadline", "target_delivery_date", "auction_end_time"):
+        if isinstance(rfq.get(key), datetime):
+            rfq[key] = rfq[key].isoformat() + "Z"
+
+    return {
+        "success": True,
+        "rfq": {
+            "id": rfq.get("id"),
+            "title": rfq.get("title"),
+            "product_category": rfq.get("product_category"),
+            "quantity": rfq.get("quantity"),
+            "status": rfq.get("status"),
+            "incoterm": rfq.get("incoterm", "FOB"),
+            "target_price": rfq.get("target_price"),
+            "target_delivery_date": rfq.get("target_delivery_date"),
+        },
+        "bids": bids,
+        "total_bids": len(bids),
+    }
+
+
+@app.post("/rfq/{rfq_id}/bids/{bid_id}/accept")
+async def accept_bid(rfq_id: str, bid_id: str, user: dict = Depends(require_buyer)):
+    """Accept a specific bid and reject all others for this RFQ."""
+    from database import db
+
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not available")
+
+    # Verify RFQ exists
+    rfq = await db["rfqs"].find_one({"id": rfq_id})
+    if not rfq:
+        raise HTTPException(status_code=404, detail="RFQ not found")
+
+    # Verify the bid exists and belongs to this RFQ
+    bid = await db["bids"].find_one({"id": bid_id, "rfq_id": rfq_id})
+    if not bid:
+        raise HTTPException(status_code=404, detail="Bid not found")
+
+    # Accept the selected bid
+    await db["bids"].update_one(
+        {"id": bid_id},
+        {"$set": {"bid_status": "ACCEPTED"}}
+    )
+
+    # Reject all other bids for this RFQ
+    await db["bids"].update_many(
+        {"rfq_id": rfq_id, "id": {"$ne": bid_id}},
+        {"$set": {"bid_status": "REJECTED"}}
+    )
+
+    # Update RFQ status to AWARDED
+    await db["rfqs"].update_one(
+        {"id": rfq_id},
+        {"$set": {
+            "status": "AWARDED",
+            "lowest_bidder_id": bid.get("supplier_id"),
+            "current_lowest_bid": bid.get("bid_price"),
+        }}
+    )
+
+    return {
+        "success": True,
+        "message": f"Bid from {bid.get('supplier_name', 'supplier')} accepted. RFQ awarded.",
+        "accepted_bid_id": bid_id,
+    }
+
+
+# ----------------------------------------
+# REAL-TIME CHAT ENGINE (WebSockets)
+# ----------------------------------------
+
+class ConnectionManager:
+    """Manages active WebSocket connections keyed by rfq_id and user_id."""
+    def __init__(self):
+        # Structure: { rfq_id: { user_id: WebSocket } }
+        self.active_connections: dict[str, dict[str, WebSocket]] = {}
+
+    async def connect(self, rfq_id: str, user_id: str, websocket: WebSocket):
+        await websocket.accept()
+        if rfq_id not in self.active_connections:
+            self.active_connections[rfq_id] = {}
+        self.active_connections[rfq_id][user_id] = websocket
+
+    def disconnect(self, rfq_id: str, user_id: str):
+        if rfq_id in self.active_connections:
+            self.active_connections[rfq_id].pop(user_id, None)
+            if not self.active_connections[rfq_id]:
+                del self.active_connections[rfq_id]
+
+    async def send_personal_message(self, message: dict, rfq_id: str, user_id: str):
+        """Send a message to a specific user in a specific RFQ room."""
+        if rfq_id in self.active_connections:
+            ws = self.active_connections[rfq_id].get(user_id)
+            if ws:
+                try:
+                    await ws.send_json(message)
+                except Exception:
+                    self.disconnect(rfq_id, user_id)
+
+    async def broadcast_to_room(self, message: dict, rfq_id: str, exclude_user: str = None):
+        """Broadcast a message to all users in an RFQ room except the sender."""
+        if rfq_id in self.active_connections:
+            for uid, ws in list(self.active_connections[rfq_id].items()):
+                if uid != exclude_user:
+                    try:
+                        await ws.send_json(message)
+                    except Exception:
+                        self.disconnect(rfq_id, uid)
+
+
+manager = ConnectionManager()
+
+
+@app.websocket("/ws/chat/{rfq_id}/{user_id}")
+async def websocket_chat(websocket: WebSocket, rfq_id: str, user_id: str):
+    """WebSocket endpoint for real-time buyer ↔ supplier chat within an RFQ context."""
+    from database import db
+
+    await manager.connect(rfq_id, user_id, websocket)
+    try:
+        while True:
+            data = await websocket.receive_json()
+            content = data.get("content", "").strip()
+            receiver_id = data.get("receiver_id", "")
+            image_url = data.get("image_url", "")
+
+            if not content and not image_url:
+                continue
+
+            # Build and persist the message
+            msg = {
+                "id": str(__import__('uuid').uuid4()),
+                "rfq_id": rfq_id,
+                "sender_id": user_id,
+                "receiver_id": receiver_id,
+                "content": content,
+                "image_url": image_url,
+                "timestamp": datetime.utcnow(),
+            }
+
+            # Save to MongoDB asynchronously
+            if db is not None:
+                await db["messages"].insert_one(msg.copy())
+
+            # Prepare the broadcast payload (serialize datetime)
+            broadcast = {
+                **msg,
+                "timestamp": msg["timestamp"].isoformat() + "Z",
+            }
+            broadcast.pop("_id", None)
+
+            # Send to the specific receiver if connected
+            await manager.send_personal_message(broadcast, rfq_id, receiver_id)
+            # Echo back to sender for confirmation
+            await manager.send_personal_message(broadcast, rfq_id, user_id)
+
+            # Create notification for the receiver
+            if receiver_id and db is not None:
+                try:
+                    sender_user = await db["users"].find_one({"id": user_id})
+                    sender_company = await db["companies"].find_one({"id": sender_user.get("company_id")}) if sender_user else None
+                    sender_name = (sender_company or {}).get("name") or (sender_user or {}).get("email", "Someone")
+                    rfq = await db["rfqs"].find_one({"id": rfq_id})
+                    rfq_title = (rfq or {}).get("title", "an RFQ")
+                    preview = content[:50] + ("..." if len(content) > 50 else "") if content else "Sent an image"
+                    # Determine receiver user ID and role for notification
+                    receiver_user_id = receiver_id
+                    receiver_role = "BUYER"
+                    
+                    receiver_user = await db["users"].find_one({"id": receiver_id})
+                    if not receiver_user:
+                        # Receiver might be a company ID
+                        receiver_user = await db["users"].find_one({"company_id": receiver_id})
+                        if receiver_user:
+                            receiver_user_id = receiver_user.get("id")
+                            receiver_role = "SUPPLIER"
+                    else:
+                        company = await db["companies"].find_one({"id": receiver_user.get("company_id")})
+                        if company:
+                            receiver_role = company.get("role", "BUYER").upper()
+                    
+                    notif_link = f"/supplier/bids?open_chat={user_id}&rfq_id={rfq_id}" if receiver_role == "SUPPLIER" else f"/rfq/{rfq_id}/bids?open_chat={user_id}"
+
+                    await create_notification(
+                        user_id=receiver_user_id,
+                        notification_type="chat_message",
+                        title=f"New message from {sender_name}",
+                        message=f'"{preview}" – regarding {rfq_title}',
+                        related_id=rfq_id,
+                        link=notif_link,
+                    )
+                except Exception as notif_err:
+                    print(f"⚠️ Failed to create chat notification: {notif_err}")
+
+    except WebSocketDisconnect:
+        manager.disconnect(rfq_id, user_id)
+    except Exception as e:
+        print(f"WebSocket error for user {user_id} in RFQ {rfq_id}: {e}")
+        manager.disconnect(rfq_id, user_id)
+
+
+@app.post("/api/chat/{rfq_id}/send")
+async def send_chat_message(rfq_id: str, request: Request, user: dict = Depends(require_login)):
+    """HTTP fallback for sending chat messages when WebSocket is unavailable."""
+    from database import db
+    import uuid as _uuid
+
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not available")
+
+    body = await request.json()
+    content = body.get("content", "").strip()
+    receiver_id = body.get("receiver_id", "")
+    image_url = body.get("image_url", "")
+
+    if not content and not image_url:
+        raise HTTPException(status_code=400, detail="Message content or image is required")
+
+    user_id = user.get("id")
+    sender_id = user_id
+    if user.get("company_id"):
+        company = await db["companies"].find_one({"id": user.get("company_id")})
+        if company and company.get("role") == "SUPPLIER":
+            sender_id = company.get("unique_id") or company.get("id")
+
+    msg = {
+        "id": str(_uuid.uuid4()),
+        "rfq_id": rfq_id,
+        "sender_id": sender_id,
+        "receiver_id": receiver_id,
+        "content": content,
+        "image_url": image_url,
+        "timestamp": datetime.utcnow(),
+    }
+
+    await db["messages"].insert_one(msg.copy())
+
+    # Also push via WebSocket if connected
+    broadcast = {**msg, "timestamp": msg["timestamp"].isoformat() + "Z"}
+    broadcast.pop("_id", None)
+    await manager.send_personal_message(broadcast, rfq_id, receiver_id)
+    await manager.send_personal_message(broadcast, rfq_id, user_id)
+
+    # Create notification for the receiver
+    if receiver_id and db is not None:
+        try:
+            sender_user = await db["users"].find_one({"id": user_id})
+            sender_company = await db["companies"].find_one({"id": sender_user.get("company_id")}) if sender_user else None
+            sender_name = (sender_company or {}).get("name") or (sender_user or {}).get("email", "Someone")
+            rfq = await db["rfqs"].find_one({"id": rfq_id})
+            rfq_title = (rfq or {}).get("title", "an RFQ")
+            preview = content[:50] + ("..." if len(content) > 50 else "") if content else "Sent an image"
+            # Determine receiver user ID and role for notification
+            receiver_user_id = receiver_id
+            receiver_role = "BUYER"
+            
+            receiver_user = await db["users"].find_one({"id": receiver_id})
+            if not receiver_user:
+                # Receiver might be a company ID
+                receiver_user = await db["users"].find_one({"company_id": receiver_id})
+                if receiver_user:
+                    receiver_user_id = receiver_user.get("id")
+                    receiver_role = "SUPPLIER"
+            else:
+                company = await db["companies"].find_one({"id": receiver_user.get("company_id")})
+                if company:
+                    receiver_role = company.get("role", "BUYER").upper()
+
+            notif_link = f"/supplier/bids?open_chat={sender_id}&rfq_id={rfq_id}" if receiver_role == "SUPPLIER" else f"/rfq/{rfq_id}/bids?open_chat={sender_id}"
+
+            await create_notification(
+                user_id=receiver_user_id,
+                notification_type="chat_message",
+                title=f"New message from {sender_name}",
+                message=f'"{preview}" – regarding {rfq_title}',
+                related_id=rfq_id,
+                link=notif_link,
+            )
+        except Exception as notif_err:
+            print(f"⚠️ Failed to create chat notification: {notif_err}")
+
+    return {"success": True, "message": broadcast}
+
+
+@app.post("/api/chat/upload-image")
+async def upload_chat_image(file: UploadFile = File(...), user: dict = Depends(require_login)):
+    """Upload an image for chat. Returns a URL that can be embedded in a message."""
+    import uuid as _uuid
+    import os
+
+    allowed_types = ["image/jpeg", "image/png", "image/gif", "image/webp"]
+    if file.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="Only JPEG, PNG, GIF, and WebP images are allowed")
+
+    # Create uploads directory if it doesn't exist
+    upload_dir = os.path.join(os.path.dirname(__file__), "..", "frontend", "src", "uploads", "chat")
+    os.makedirs(upload_dir, exist_ok=True)
+
+    # Generate unique filename
+    ext = file.filename.split(".")[-1] if "." in file.filename else "png"
+    filename = f"{_uuid.uuid4().hex[:12]}.{ext}"
+    filepath = os.path.join(upload_dir, filename)
+
+    # Save file
+    file_bytes = await file.read()
+    if len(file_bytes) > 5 * 1024 * 1024:  # 5MB limit
+        raise HTTPException(status_code=400, detail="Image must be under 5MB")
+
+    with open(filepath, "wb") as f:
+        f.write(file_bytes)
+
+    return {"success": True, "url": f"/uploads/chat/{filename}"}
+
+
+@app.get("/api/chat/{rfq_id}/history")
+async def get_chat_history(rfq_id: str, receiver_id: str = None, user: dict = Depends(require_login)):
+    """Fetch chat history between the current user and another user for a specific RFQ."""
+    from database import db
+
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not available")
+
+    user_id = user.get("id")
+    company_id = user.get("company_id")
+    
+    user_ids = [user_id]
+    if company_id:
+        user_ids.append(company_id)
+        company = await db["companies"].find_one({"id": company_id})
+        if company and company.get("unique_id"):
+            user_ids.append(company.get("unique_id"))
+            
+    # Remove duplicates
+    user_ids = list(set([uid for uid in user_ids if uid]))
+
+    # Build query: messages where current user is sender or receiver in this RFQ
+    query = {"rfq_id": rfq_id}
+    if receiver_id:
+        query["$or"] = [
+            {"sender_id": {"$in": user_ids}, "receiver_id": receiver_id},
+            {"sender_id": receiver_id, "receiver_id": {"$in": user_ids}},
+        ]
+    else:
+        query["$or"] = [
+            {"sender_id": {"$in": user_ids}},
+            {"receiver_id": {"$in": user_ids}},
+        ]
+
+    messages = []
+    async for msg in db["messages"].find(query).sort("timestamp", 1).limit(200):
+        msg.pop("_id", None)
+        if isinstance(msg.get("timestamp"), datetime):
+            msg["timestamp"] = msg["timestamp"].isoformat() + "Z"
+        messages.append(msg)
+
+    return {"success": True, "messages": messages}

@@ -36,9 +36,10 @@
     </script>
     <!-- Custom CSS -->
     <link href="{{ url_for('static', path='/css/style.css') }}" rel="stylesheet">
+    <script src="{{ url_for('static', path='/js/app.js') }}" defer></script>
 </head>
 
-<body class="font-sans text-gray-800 bg-gray-50 flex flex-col min-h-screen">
+<body class="font-sans text-gray-800 bg-gray-50 flex flex-col min-h-screen" data-current-role="{{ user.role if user else 'guest' }}">
 
     <!-- Navigation -->
     <nav class="bg-brand-dark bg-opacity-95 backdrop-blur shadow-md sticky top-0 z-50 transition-all duration-300">
@@ -79,7 +80,7 @@
                         </button>
                         <!-- Dropdown Menu -->
                         <div class="absolute left-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                            <a href="/rfq/create" class="block px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors flex items-center gap-2 rounded-t-lg">
+                            <a href="/rfq/create" data-role="buyer" id="create-rfq-btn" class="block px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors flex items-center gap-2 rounded-t-lg">
                                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                                 </svg>
@@ -287,8 +288,8 @@
                                 Us</a></li>
                         <li><a href="#"
                                 class="text-gray-400 hover:text-brand-light text-sm transition-colors">Contact</a></li>
-                        <li><a href="/admin/subscriptions" class="text-gray-400 hover:text-purple-400 text-sm transition-colors">Admin Dashboard</a></li>
-                        <li><a href="/admin/analytics" class="text-gray-400 hover:text-red-400 text-sm transition-colors">Admin Analytics</a></li>
+                        <li><a href="/admin/subscriptions" data-role="admin" id="admin-dashboard-link" class="text-gray-400 hover:text-purple-400 text-sm transition-colors">Admin Dashboard</a></li>
+                        <li><a href="/admin/analytics" data-role="admin" id="admin-analytics-link" class="text-gray-400 hover:text-red-400 text-sm transition-colors">Admin Analytics</a></li>
                         <li><a href="#" class="text-gray-400 hover:text-brand-light text-sm transition-colors">Privacy
                                 Policy</a></li>
                     </ul>
@@ -391,7 +392,7 @@
                 const timeAgo = formatTimeAgo(notif.created_at);
                 
                 return `
-                    <div class="notification-item ${bgClass} hover:bg-gray-50 px-4 py-3 border-b border-gray-100 cursor-pointer transition-colors" data-id="${notif.id}">
+                    <div class="notification-item ${bgClass} hover:bg-gray-50 px-4 py-3 border-b border-gray-100 cursor-pointer transition-colors" data-id="${notif.id}" data-link="${notif.link}">
                         <div class="flex gap-3">
                             <div class="flex-shrink-0">
                                 ${icon}
@@ -411,7 +412,12 @@
             document.querySelectorAll('.notification-item').forEach(item => {
                 item.addEventListener('click', () => {
                     const notifId = item.getAttribute('data-id');
-                    markAsRead(notifId);
+                    const notifLink = item.getAttribute('data-link');
+                    markAsRead(notifId).then(() => {
+                        if (notifLink && notifLink !== 'null' && notifLink !== 'undefined') {
+                            window.location.href = notifLink;
+                        }
+                    });
                 });
             });
         }

@@ -1,0 +1,594 @@
+{% extends "base.html" %}
+
+{% block title %}Bid Comparison Matrix – TexBid{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+
+  <!-- Hero Header -->
+  <div class="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div>
+          <div class="flex items-center gap-3 mb-2">
+            <div class="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center border border-blue-400/30">
+              <svg class="h-5 w-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+              </svg>
+            </div>
+            <h1 id="pageTitle" class="text-2xl lg:text-3xl font-extrabold">Bid Comparison Matrix</h1>
+          </div>
+          <p id="rfqSubtitle" class="text-blue-200 text-sm">Loading RFQ details...</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <a href="/dashboard/buyer" class="inline-flex items-center gap-2 px-4 py-2 bg-white/10 border border-white/20 text-white font-semibold rounded-xl hover:bg-white/20 transition-colors text-sm">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+            Dashboard
+          </a>
+          <div id="rfqStatusBadge" class="px-3 py-1.5 rounded-full text-xs font-bold bg-blue-500/20 text-blue-300 border border-blue-400/30">Loading</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats Bar -->
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-5">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="bg-white rounded-xl shadow-lg p-4 text-center border border-gray-100">
+        <p class="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Total Bids</p>
+        <p id="statTotalBids" class="text-2xl font-extrabold text-gray-900">—</p>
+      </div>
+      <div class="bg-white rounded-xl shadow-lg p-4 text-center border border-gray-100">
+        <p class="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Lowest Price</p>
+        <p id="statLowestPrice" class="text-2xl font-extrabold text-green-600">—</p>
+      </div>
+      <div class="bg-white rounded-xl shadow-lg p-4 text-center border border-gray-100">
+        <p class="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Fastest Delivery</p>
+        <p id="statFastestDelivery" class="text-2xl font-extrabold text-blue-600">—</p>
+      </div>
+      <div class="bg-white rounded-xl shadow-lg p-4 text-center border border-gray-100">
+        <p class="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Avg Trust Score</p>
+        <p id="statAvgTrust" class="text-2xl font-extrabold text-purple-600">—</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+    <!-- Comparison Table -->
+    <div class="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100">
+      <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-gray-50 to-white">
+        <div class="flex items-center gap-3">
+          <h2 class="text-lg font-bold text-gray-900">Supplier Bids</h2>
+          <span id="bidCountLabel" class="text-xs text-gray-400">Loading...</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="inline-flex items-center gap-1 text-xs text-green-600 font-semibold">
+            <span class="w-2.5 h-2.5 rounded-full bg-green-400"></span> Best Value
+          </span>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full min-w-[900px]">
+          <thead>
+            <tr class="bg-slate-50/80">
+              <th class="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">#</th>
+              <th class="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Supplier</th>
+              <th class="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Trust Score</th>
+              <th class="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Cost / Unit</th>
+              <th class="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Cost</th>
+              <th class="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Delivery (Days)</th>
+              <th class="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Incoterms</th>
+              <th class="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Quality Notes</th>
+              <th class="px-6 py-3.5 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Action</th>
+              <th class="px-6 py-3.5 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Chat</th>
+            </tr>
+          </thead>
+          <tbody id="bidsTableBody" class="divide-y divide-gray-100">
+            <tr>
+              <td colspan="10" class="px-6 py-16 text-center">
+                <div class="flex flex-col items-center">
+                  <div class="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
+                  <p class="text-sm text-gray-400">Loading bids...</p>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Chat Slide-out Drawer -->
+<div id="chatDrawer" class="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col border-l border-gray-200">
+  <!-- Chat Header -->
+  <div class="px-5 py-4 bg-gradient-to-r from-slate-900 to-blue-950 text-white flex items-center justify-between flex-shrink-0">
+    <div>
+      <h3 id="chatSupplierName" class="font-bold text-sm">Chat</h3>
+      <p id="chatRfqLabel" class="text-xs text-blue-300">RFQ Negotiation</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <span id="chatStatus" class="w-2 h-2 rounded-full bg-green-400"></span>
+      <button onclick="closeChatDrawer()" class="p-1.5 rounded-lg hover:bg-white/10 transition-colors">
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+  </div>
+  <!-- Messages Area -->
+  <div id="chatMessages" class="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
+    <div class="text-center py-8">
+      <p class="text-xs text-gray-400">Loading messages...</p>
+    </div>
+  </div>
+  <!-- Input Area -->
+  <div class="p-4 border-t border-gray-200 bg-white flex-shrink-0">
+    <div class="flex gap-2 items-center">
+      <label class="cursor-pointer text-gray-400 hover:text-blue-600 transition-colors">
+        <input type="file" id="chatImageInput" accept="image/jpeg,image/png,image/gif,image/webp" class="hidden" onchange="uploadChatImage()">
+        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+        </svg>
+      </label>
+      <input id="chatInput" type="text" placeholder="Type a message..." class="flex-1 px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" onkeydown="if(event.key==='Enter')sendChatMessage()">
+      <button onclick="sendChatMessage()" class="px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors flex-shrink-0">
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+<!-- Chat backdrop -->
+<div id="chatBackdrop" class="hidden fixed inset-0 bg-black/30 z-40" onclick="closeChatDrawer()"></div>
+
+<!-- Accept Bid Confirmation Modal -->
+<div id="acceptModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+    <div class="flex items-center gap-3 mb-4">
+      <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+        <svg class="h-5 w-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+      </div>
+      <h3 class="text-lg font-bold text-gray-900">Accept This Bid?</h3>
+    </div>
+    <p class="text-sm text-gray-600 mb-2">You are about to award this RFQ to:</p>
+    <div class="bg-gray-50 rounded-xl p-4 mb-4">
+      <p id="modalSupplierName" class="text-sm font-bold text-gray-900"></p>
+      <p id="modalBidPrice" class="text-sm text-green-600 font-semibold"></p>
+    </div>
+    <p class="text-xs text-gray-500 mb-6">This will reject all other bids and mark the RFQ as AWARDED. This action cannot be undone.</p>
+    <div class="flex gap-3">
+      <button onclick="closeAcceptModal()" class="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-colors text-sm">Cancel</button>
+      <button id="confirmAcceptBtn" class="flex-1 px-4 py-2.5 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition-colors text-sm">Confirm Award</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const RFQ_ID = "{{ rfq_id }}";
+let rfqData = null;
+let bidsData = [];
+let pendingAcceptBid = null;
+
+// ─── Load Data ───
+async function loadBidComparison() {
+  try {
+    const res = await fetch(`/rfq/${RFQ_ID}/compare-bids`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
+    if (!data.success) {
+      showError('Failed to load bids');
+      return;
+    }
+
+    rfqData = data.rfq;
+    bidsData = data.bids;
+
+    updateHeader(rfqData);
+    updateStats(bidsData, rfqData);
+    renderBidsTable(bidsData, rfqData);
+
+    // Auto-open chat if requested via query param
+    const urlParams = new URLSearchParams(window.location.search);
+    const openChatId = urlParams.get('open_chat');
+    if (openChatId) {
+      const targetBid = bidsData.find(b => b.supplier_id === openChatId);
+      const supplierName = targetBid ? targetBid.supplier_name : 'Supplier';
+      setTimeout(() => openChatDrawer(openChatId, supplierName), 300);
+      
+      // Clean up URL without reloading
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+    }
+
+  } catch (err) {
+    console.error('Error loading bids:', err);
+    showError('Unable to load bid data. Please refresh.');
+  }
+}
+
+function updateHeader(rfq) {
+  document.getElementById('pageTitle').textContent = `Bid Comparison – ${rfq.title || 'Untitled RFQ'}`;
+  document.getElementById('rfqSubtitle').textContent = `${rfq.product_category || ''} · ${(rfq.quantity || 0).toLocaleString()} units · ${rfq.incoterm || 'FOB'}`;
+
+  const badge = document.getElementById('rfqStatusBadge');
+  const statusColors = {
+    OPEN: 'bg-blue-500/20 text-blue-300 border-blue-400/30',
+    EVALUATING: 'bg-yellow-500/20 text-yellow-300 border-yellow-400/30',
+    AWARDED: 'bg-green-500/20 text-green-300 border-green-400/30',
+    CLOSED: 'bg-gray-500/20 text-gray-300 border-gray-400/30',
+  };
+  badge.className = `px-3 py-1.5 rounded-full text-xs font-bold border ${statusColors[rfq.status] || statusColors.OPEN}`;
+  badge.textContent = rfq.status || 'OPEN';
+}
+
+function updateStats(bids, rfq) {
+  document.getElementById('statTotalBids').textContent = bids.length;
+
+  if (bids.length === 0) return;
+
+  const prices = bids.map(b => b.bid_price);
+  const deliveries = bids.filter(b => b.delivery_time_days).map(b => b.delivery_time_days);
+  const trusts = bids.map(b => b.trust_score || 0);
+
+  document.getElementById('statLowestPrice').textContent = `$${Math.min(...prices).toFixed(2)}`;
+  document.getElementById('statFastestDelivery').textContent = deliveries.length ? `${Math.min(...deliveries)}d` : 'N/A';
+  document.getElementById('statAvgTrust').textContent = `${Math.round(trusts.reduce((a, b) => a + b, 0) / trusts.length)}/100`;
+}
+
+// ─── Render Table ───
+function renderBidsTable(bids, rfq) {
+  const tbody = document.getElementById('bidsTableBody');
+  const label = document.getElementById('bidCountLabel');
+  label.textContent = `${bids.length} bid${bids.length !== 1 ? 's' : ''} received`;
+
+  if (bids.length === 0) {
+    tbody.innerHTML = `
+      <tr><td colspan="10" class="px-6 py-16 text-center">
+        <svg class="h-16 w-16 text-gray-200 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+        </svg>
+        <p class="text-base font-semibold text-gray-500 mb-1">No bids yet</p>
+        <p class="text-sm text-gray-400">Suppliers haven't submitted bids for this RFQ yet.</p>
+      </td></tr>`;
+    return;
+  }
+
+  // Find best values for highlighting
+  const lowestPrice = Math.min(...bids.map(b => b.bid_price));
+  const deliveries = bids.filter(b => b.delivery_time_days).map(b => b.delivery_time_days);
+  const fastestDelivery = deliveries.length ? Math.min(...deliveries) : null;
+  const qty = rfq.quantity || 1;
+
+  tbody.innerHTML = bids.map((bid, i) => {
+    const isBestPrice = bid.bid_price === lowestPrice;
+    const isFastestDelivery = bid.delivery_time_days && bid.delivery_time_days === fastestDelivery;
+    const isAccepted = bid.bid_status === 'ACCEPTED';
+    const isRejected = bid.bid_status === 'REJECTED';
+    const totalCost = bid.bid_price * qty;
+
+    const trustPct = Math.min(bid.trust_score || 0, 100);
+    const trustColor = trustPct >= 70 ? 'bg-green-500' : trustPct >= 40 ? 'bg-yellow-500' : 'bg-red-500';
+
+    const verifiedBadge = bid.verification_status === 'VERIFIED'
+      ? '<span class="ml-1 inline-flex items-center"><svg class="h-3.5 w-3.5 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg></span>'
+      : '';
+
+    const rowBg = isAccepted ? 'bg-green-50/60' : isRejected ? 'bg-gray-50/60 opacity-60' : 'bg-white hover:bg-slate-50/80';
+
+    let actionCell;
+    if (isAccepted) {
+      actionCell = '<span class="px-3 py-1.5 rounded-full text-xs font-bold bg-green-100 text-green-700">✓ Awarded</span>';
+    } else if (isRejected) {
+      actionCell = '<span class="px-3 py-1.5 rounded-full text-xs font-bold bg-gray-100 text-gray-500">Rejected</span>';
+    } else {
+      actionCell = `<button onclick="openAcceptModal('${bid.id}', '${(bid.company_name || '').replace(/'/g, "\\'")}', ${bid.bid_price})" class="px-4 py-2 bg-green-600 text-white text-xs font-bold rounded-lg hover:bg-green-700 transition-all shadow-sm hover:shadow-md">Accept Bid</button>`;
+    }
+
+    return `
+      <tr class="${rowBg} transition-colors">
+        <td class="px-6 py-4 text-sm text-gray-400 font-mono">${i + 1}</td>
+        <td class="px-6 py-4">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+              ${(bid.company_name || 'U')[0].toUpperCase()}
+            </div>
+            <div>
+              <p class="text-sm font-semibold text-gray-900 flex items-center">${bid.company_name || 'Unknown'}${verifiedBadge}</p>
+              <p class="text-xs text-gray-400">Rating: ${bid.average_rating > 0 ? '★ ' + bid.average_rating : 'No reviews'}</p>
+            </div>
+          </div>
+        </td>
+        <td class="px-6 py-4">
+          <div class="flex items-center gap-2">
+            <div class="w-16 bg-gray-200 rounded-full h-1.5"><div class="${trustColor} h-1.5 rounded-full" style="width:${trustPct}%"></div></div>
+            <span class="text-xs font-bold text-gray-700">${trustPct}</span>
+          </div>
+        </td>
+        <td class="px-6 py-4 ${isBestPrice ? 'bg-green-50' : ''}">
+          <span class="text-sm font-bold ${isBestPrice ? 'text-green-700' : 'text-gray-900'}">$${bid.bid_price.toFixed(2)}</span>
+          ${isBestPrice ? '<span class="ml-1.5 text-xs text-green-600 font-semibold">★ Best</span>' : ''}
+        </td>
+        <td class="px-6 py-4 text-sm font-semibold text-gray-700">$${totalCost.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+        <td class="px-6 py-4 ${isFastestDelivery ? 'bg-green-50' : ''}">
+          <span class="text-sm font-bold ${isFastestDelivery ? 'text-green-700' : 'text-gray-900'}">${bid.delivery_time_days || '—'}</span>
+          ${isFastestDelivery ? '<span class="ml-1.5 text-xs text-green-600 font-semibold">★ Fastest</span>' : ''}
+        </td>
+        <td class="px-6 py-4"><span class="px-2 py-1 text-xs font-semibold rounded-md bg-slate-100 text-slate-700">${bid.incoterms || 'FOB'}</span></td>
+        <td class="px-6 py-4 text-xs text-gray-600 max-w-[200px] truncate" title="${(bid.quality_notes || '').replace(/"/g, '&quot;')}">${bid.quality_notes || '—'}</td>
+        <td class="px-6 py-4 text-center">${actionCell}</td>
+        <td class="px-6 py-4 text-center">
+          <button onclick="openChatDrawer('${bid.supplier_id}', '${(bid.company_name || '').replace(/'/g, "\\'")}')"
+            class="px-3 py-1.5 bg-blue-50 text-blue-600 text-xs font-bold rounded-lg hover:bg-blue-100 transition-all inline-flex items-center gap-1">
+            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+            Chat
+          </button>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+// ─── Accept Bid Modal ───
+function openAcceptModal(bidId, supplierName, price) {
+  pendingAcceptBid = bidId;
+  document.getElementById('modalSupplierName').textContent = supplierName;
+  document.getElementById('modalBidPrice').textContent = `$${price.toFixed(2)} per unit`;
+  document.getElementById('acceptModal').classList.remove('hidden');
+}
+
+function closeAcceptModal() {
+  pendingAcceptBid = null;
+  document.getElementById('acceptModal').classList.add('hidden');
+}
+
+document.getElementById('confirmAcceptBtn').addEventListener('click', async () => {
+  if (!pendingAcceptBid) return;
+  const btn = document.getElementById('confirmAcceptBtn');
+  btn.disabled = true;
+  btn.textContent = 'Processing...';
+
+  try {
+    const res = await fetch(`/rfq/${RFQ_ID}/bids/${pendingAcceptBid}/accept`, { method: 'POST' });
+    const data = await res.json();
+
+    if (data.success) {
+      closeAcceptModal();
+      loadBidComparison(); // Reload to reflect changes
+    } else {
+      alert(data.detail || 'Failed to accept bid');
+    }
+  } catch (err) {
+    console.error('Error accepting bid:', err);
+    alert('Network error. Please try again.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Confirm Award';
+  }
+});
+
+function showError(msg) {
+  document.getElementById('bidsTableBody').innerHTML = `
+    <tr><td colspan="10" class="px-6 py-16 text-center">
+      <svg class="h-12 w-12 text-red-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      <p class="text-sm font-semibold text-red-600">${msg}</p>
+    </td></tr>`;
+}
+
+// Close modal on backdrop click
+document.getElementById('acceptModal').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) closeAcceptModal();
+});
+
+document.addEventListener('DOMContentLoaded', loadBidComparison);
+
+// ─── Chat Drawer Logic ───
+const CURRENT_USER_ID = "{{ user.id if user else '' }}";
+let chatSocket = null;
+let chatReceiverId = null;
+
+function openChatDrawer(supplierId, supplierName) {
+  chatReceiverId = supplierId;
+  document.getElementById('chatSupplierName').textContent = supplierName;
+  document.getElementById('chatRfqLabel').textContent = `RFQ: ${rfqData?.title || RFQ_ID}`;
+  document.getElementById('chatDrawer').classList.remove('translate-x-full');
+  document.getElementById('chatBackdrop').classList.remove('hidden');
+  document.getElementById('chatMessages').innerHTML = '<div class="text-center py-8"><p class="text-xs text-gray-400">Loading messages...</p></div>';
+
+  // Load chat history
+  loadChatHistory(supplierId);
+  // Open WebSocket
+  connectWebSocket();
+}
+
+function closeChatDrawer() {
+  document.getElementById('chatDrawer').classList.add('translate-x-full');
+  document.getElementById('chatBackdrop').classList.add('hidden');
+  if (chatSocket && chatSocket.readyState === WebSocket.OPEN) {
+    chatSocket.close();
+  }
+  chatSocket = null;
+  chatReceiverId = null;
+}
+
+async function loadChatHistory(supplierId) {
+  try {
+    const res = await fetch(`/api/chat/${RFQ_ID}/history?receiver_id=${supplierId}`);
+    const data = await res.json();
+    const container = document.getElementById('chatMessages');
+
+    if (data.success && data.messages.length > 0) {
+      container.innerHTML = data.messages.map(m => renderChatBubble(m)).join('');
+    } else {
+      container.innerHTML = '<div class="text-center py-8"><div class="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-3"><svg class="h-6 w-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg></div><p class="text-xs text-gray-400">Start the conversation</p></div>';
+    }
+    container.scrollTop = container.scrollHeight;
+  } catch (err) {
+    console.error('Error loading chat history:', err);
+  }
+}
+
+function connectWebSocket() {
+  if (chatSocket && chatSocket.readyState === WebSocket.OPEN) chatSocket.close();
+
+  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  chatSocket = new WebSocket(`${protocol}//${location.host}/ws/chat/${RFQ_ID}/${CURRENT_USER_ID}`);
+
+  chatSocket.onopen = () => {
+    document.getElementById('chatStatus').className = 'w-2 h-2 rounded-full bg-green-400';
+  };
+
+  chatSocket.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+    if (msg.sender_id !== chatReceiverId && msg.receiver_id !== chatReceiverId) {
+      return;
+    }
+    const container = document.getElementById('chatMessages');
+    if (document.querySelector(`[data-msg-id="${msg.id}"]`)) return;
+    // Remove empty-state placeholder if present
+    const placeholder = container.querySelector('.text-center.py-8');
+    if (placeholder) placeholder.remove();
+    container.insertAdjacentHTML('beforeend', renderChatBubble(msg));
+    container.scrollTop = container.scrollHeight;
+  };
+
+  chatSocket.onclose = () => {
+    document.getElementById('chatStatus').className = 'w-2 h-2 rounded-full bg-gray-400';
+  };
+
+  chatSocket.onerror = () => {
+    document.getElementById('chatStatus').className = 'w-2 h-2 rounded-full bg-red-400';
+  };
+}
+
+async function sendChatMessage(imageUrl = '') {
+  const input = document.getElementById('chatInput');
+  const content = input.value.trim();
+  if (!content && !imageUrl) return;
+
+  const msgData = {
+    content: content,
+    receiver_id: chatReceiverId,
+    image_url: imageUrl
+  };
+
+  if (chatSocket && chatSocket.readyState === WebSocket.OPEN) {
+    chatSocket.send(JSON.stringify(msgData));
+  } else {
+    // Fallback to HTTP POST
+    try {
+      const res = await fetch(`/api/chat/${RFQ_ID}/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(msgData)
+      });
+      const data = await res.json();
+      if (data.success) {
+        // Manually render if fallback used, since websocket won't push back
+        const container = document.getElementById('chatMessages');
+        if (!document.querySelector(`[data-msg-id="${data.message.id}"]`)) {
+            const placeholder = container.querySelector('.text-center.py-8');
+            if (placeholder) placeholder.remove();
+            container.insertAdjacentHTML('beforeend', renderChatBubble(data.message));
+            container.scrollTop = container.scrollHeight;
+        }
+      }
+    } catch (err) {
+      console.error("Failed to send message via HTTP fallback:", err);
+      alert("Failed to send message.");
+    }
+  }
+  input.value = '';
+}
+
+async function uploadChatImage() {
+  const input = document.getElementById('chatImageInput');
+  const file = input.files[0];
+  if (!file) return;
+
+  if (file.size > 5 * 1024 * 1024) {
+    alert("Image must be under 5MB");
+    input.value = '';
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    // Show uploading indicator in chat
+    const container = document.getElementById('chatMessages');
+    const placeholder = container.querySelector('.text-center.py-8');
+    if (placeholder) placeholder.remove();
+    
+    const loadingId = 'loading-' + Date.now();
+    container.insertAdjacentHTML('beforeend', `
+      <div id="${loadingId}" class="flex justify-end">
+        <div class="max-w-[75%] px-3.5 py-2 rounded-2xl bg-blue-600 text-white shadow-sm opacity-75">
+          <p class="text-sm">Uploading image...</p>
+        </div>
+      </div>
+    `);
+    container.scrollTop = container.scrollHeight;
+
+    const res = await fetch('/api/chat/upload-image', {
+      method: 'POST',
+      body: formData
+    });
+    const data = await res.json();
+    
+    // Remove loading indicator
+    document.getElementById(loadingId)?.remove();
+
+    if (data.success) {
+      sendChatMessage(data.url);
+    } else {
+      alert(data.detail || "Upload failed");
+    }
+  } catch (err) {
+    console.error("Upload error:", err);
+    alert("An error occurred during upload.");
+    document.getElementById('loading-' + Date.now())?.remove(); // Best effort cleanup
+  } finally {
+    input.value = '';
+  }
+}
+
+function renderChatBubble(msg) {
+  const isSent = msg.sender_id === CURRENT_USER_ID;
+  const time = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}) : '';
+  const align = isSent ? 'justify-end' : 'justify-start';
+  const bubbleBg = isSent ? 'bg-blue-600 text-white' : 'bg-white text-gray-900 border border-gray-200';
+  const timeColor = isSent ? 'text-blue-200' : 'text-gray-400';
+
+  let imageHtml = '';
+  if (msg.image_url) {
+    imageHtml = `<img src="${msg.image_url}" class="max-w-full h-auto rounded-lg mb-2 max-h-48 object-cover cursor-pointer" onclick="window.open('${msg.image_url}', '_blank')">`;
+  }
+  
+  let contentHtml = '';
+  if (msg.content) {
+    contentHtml = `<p class="text-sm break-words">${escapeHtml(msg.content)}</p>`;
+  }
+
+  return `
+    <div class="flex ${align}" data-msg-id="${msg.id}">
+      <div class="max-w-[75%] px-3.5 py-2 rounded-2xl ${bubbleBg} shadow-sm">
+        ${imageHtml}
+        ${contentHtml}
+        <p class="text-[10px] ${timeColor} mt-0.5 text-right">${time}</p>
+      </div>
+    </div>`;
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+</script>
+{% endblock %}

@@ -5,6 +5,11 @@ from datetime import datetime
 import uuid
 
 # --- Enums ---
+class UserRole(str, Enum):
+    BUYER = "BUYER"
+    SELLER = "SELLER"
+    ADMIN = "ADMIN"
+
 class RoleEnum(str, Enum):
     BUYER = "BUYER"
     SUPPLIER = "SUPPLIER"
@@ -145,15 +150,36 @@ class RFQModel(BaseModel):
     lowest_bidder_id: Optional[str] = Field(None, description="Supplier ID of current lowest bidder")
 
 
+class BidStatusEnum(str, Enum):
+    PENDING = "PENDING"
+    ACCEPTED = "ACCEPTED"
+    REJECTED = "REJECTED"
+
+
 class BidModel(BaseModel):
-    """Model for storing individual bids in a reverse auction."""
+    """Model for storing individual bids (reverse auction + negotiation)."""
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="Unique bid ID")
     rfq_id: str = Field(..., description="RFQ ID for which the bid is placed")
     supplier_id: str = Field(..., description="Supplier ID placing the bid")
     supplier_name: str = Field(..., description="Supplier company name (for display)")
     bid_price: float = Field(..., gt=0, description="Bid price per unit (must be positive)")
     timestamp: datetime = Field(default_factory=datetime.utcnow, description="When the bid was placed")
-    status: str = Field(default="ACTIVE", description="ACTIVE or CANCELLED")
+    status: str = Field(default="ACTIVE", description="ACTIVE or CANCELLED (reverse auction)")
+    # Negotiation / Comparison fields
+    delivery_time_days: Optional[int] = Field(None, description="Proposed delivery time in days")
+    incoterms: str = Field(default="FOB", description="Shipping incoterm (e.g. FOB, CIF, DDP)")
+    quality_notes: Optional[str] = Field(None, description="Supplier notes on quality, certifications, etc.")
+    bid_status: BidStatusEnum = Field(default=BidStatusEnum.PENDING, description="Negotiation status")
+
+
+class MessageModel(BaseModel):
+    """Model for real-time chat messages between buyer and supplier."""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="Unique message ID")
+    rfq_id: str = Field(..., description="RFQ context for this conversation")
+    sender_id: str = Field(..., description="User ID of the sender")
+    receiver_id: str = Field(..., description="User ID of the receiver")
+    content: str = Field(..., description="Message text content")
+    timestamp: datetime = Field(default_factory=datetime.utcnow, description="When the message was sent")
 
 
 class NotificationTypeEnum(str, Enum):
