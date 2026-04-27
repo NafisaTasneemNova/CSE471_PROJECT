@@ -7,59 +7,54 @@
 {% block content %}
 <div class="h-[calc(100vh-80px)] flex overflow-hidden bg-slate-50">
 
-    <!-- LEFT SIDEBAR: Incoming Opportunities (25%) -->
-    <div
-        class="w-1/4 min-w-[320px] max-w-[400px] border-r border-slate-200 bg-slate-50 flex flex-col h-full overflow-hidden">
+    <!-- LEFT SIDEBAR -->
+    <div class="w-1/4 min-w-[320px] max-w-[400px] border-r border-slate-200 bg-slate-50 flex flex-col h-full overflow-hidden">
 
-        <!-- Sidebar Header -->
-        <div class="p-5 border-b border-slate-200 bg-white sticky top-0 z-10 shrink-0">
-            <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
-                Incoming Opportunities
-                <span class="bg-[#2563eb] text-white text-xs px-2 py-0.5 rounded-full">{{ rfqs|length }}</span>
-            </h2>
-            <div class="mt-3 flex gap-2">
-                <input type="text" placeholder="Search orders..."
-                    class="w-full text-sm border-slate-200 rounded-md bg-slate-50 focus:border-[#2563eb] focus:ring-[#2563eb]">
-            </div>
+        <!-- Tabs -->
+        <div class="flex border-b border-slate-200 bg-white shrink-0">
+            <button id="tab-rfqs" onclick="switchTab('rfqs')"
+                class="flex-1 py-3 text-sm font-bold text-blue-600 border-b-2 border-blue-600 transition-colors">
+                Browse RFQs
+                <span class="ml-1 bg-blue-100 text-blue-700 text-xs px-1.5 py-0.5 rounded-full">{{ rfqs|length }}</span>
+            </button>
+            <button id="tab-orders" onclick="switchTab('orders')"
+                class="flex-1 py-3 text-sm font-bold text-slate-400 border-b-2 border-transparent hover:text-slate-700 transition-colors">
+                My Orders
+                {% if orders %}
+                <span class="ml-1 bg-green-100 text-green-700 text-xs px-1.5 py-0.5 rounded-full">{{ orders|length }}</span>
+                {% endif %}
+            </button>
         </div>
 
-        <!-- Scrollable List of RFQs -->
-        <div class="overflow-y-auto flex-1 p-3 space-y-3">
-
+        <!-- RFQ Feed Panel -->
+        <div id="panel-rfqs" class="overflow-y-auto flex-1 p-3 space-y-3">
             {% if rfqs|length == 0 %}
             <div class="text-center py-10">
                 <p class="text-sm text-slate-500">No active RFQs at the moment.</p>
             </div>
             {% else %}
             {% for rfq in rfqs %}
-            <!-- RFQ Card (Compact) -->
-            <a href="/rfq/{{ rfq.id }}"
-                class="block bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:border-[#2563eb] hover:shadow-md transition cursor-pointer group">
-                <div class="flex flex-col gap-3">
-                    <!-- Top section: Thumbnail + Title -->
+            <div class="rfq-card bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:border-[#2563eb] hover:shadow-md transition cursor-pointer group"
+                 data-rfq-id="{{ rfq.id }}"
+                 data-rfq-title="{{ rfq.title if rfq.title else rfq.product_category }}"
+                 data-rfq-qty="{{ rfq.quantity }}">
+                <a href="/rfq/{{ rfq.id }}" class="flex flex-col gap-3">
                     <div class="flex gap-3">
-                        <div
-                            class="w-16 h-16 rounded-lg bg-slate-100 border border-slate-200 shrink-0 flex items-center justify-center overflow-hidden">
-                            <!-- Mock Thumbnail -->
-                            <svg class="w-8 h-8 text-slate-300 group-hover:text-[#2563eb] transition-colors"
-                                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <div class="w-16 h-16 rounded-lg bg-slate-100 border border-slate-200 shrink-0 flex items-center justify-center overflow-hidden">
+                            <svg class="w-8 h-8 text-slate-300 group-hover:text-[#2563eb] transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                                 <path d="M20 9v11a2 2 0 01-2 2H6a2 2 0 01-2-2V9" />
                                 <path d="M9 22V12h6v10m-1.5-13V2l3-2h-9l3 2v7.5" />
                             </svg>
                         </div>
                         <div>
-                            <h3
-                                class="font-bold text-slate-800 text-sm leading-tight group-hover:text-[#2563eb] transition-colors line-clamp-2">
+                            <h3 class="font-bold text-slate-800 text-sm leading-tight group-hover:text-[#2563eb] transition-colors line-clamp-2">
                                 {{ rfq.title if rfq.title else (rfq.product_category ~ ' Request') }}
                             </h3>
-                            <span
-                                class="inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase {{ 'bg-red-50 text-red-600 border border-red-100' if rfq.urgency_level == 'HIGH' else ('bg-orange-50 text-orange-600 border border-orange-100' if rfq.urgency_level == 'MEDIUM' else 'bg-blue-50 text-blue-600 border border-blue-100') }}">
+                            <span class="inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase {{ 'bg-red-50 text-red-600 border border-red-100' if rfq.urgency_level == 'HIGH' else ('bg-orange-50 text-orange-600 border border-orange-100' if rfq.urgency_level == 'MEDIUM' else 'bg-blue-50 text-blue-600 border border-blue-100') }}">
                                 {{ rfq.urgency_level if rfq.urgency_level else 'STANDARD' }} URGENCY
                             </span>
                         </div>
                     </div>
-
-                    <!-- The Big Three Stats -->
                     <div class="bg-slate-50 rounded-lg p-2.5 grid grid-cols-2 gap-2 border border-slate-100">
                         <div>
                             <p class="text-[10px] text-slate-500 font-medium uppercase">Quantity</p>
@@ -67,291 +62,188 @@
                         </div>
                         <div>
                             <p class="text-[10px] text-slate-500 font-medium uppercase">Deadline</p>
-                            <p class="font-bold text-slate-800 text-sm">{{ rfq.target_delivery_date if
-                                rfq.target_delivery_date else 'TBD' }}</p>
+                            <p class="font-bold text-slate-800 text-sm">{{ rfq.target_delivery_date if rfq.target_delivery_date else 'TBD' }}</p>
                         </div>
                     </div>
-
-                    <!-- Buyer Badge -->
-                    <div class="flex items-center gap-1.5 pt-1">
-                        <svg class="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
-                            <path
-                                d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z">
-                            </path>
-                        </svg>
-                        <span class="text-xs font-bold text-slate-700">Verified Buyer</span>
-                    </div>
-
-                    <p class="text-[10px] text-slate-400 font-mono truncate" title="RFQ ID">ID: {{ rfq.id }}</p>
-
-                    {% if rfq.get('is_reverse_auction') %}
-                    <span class="inline-flex items-center justify-center gap-1.5 w-full py-2 rounded-lg text-xs font-bold bg-amber-500 text-white group-hover:bg-amber-600 transition">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                        Reverse Auction
-                    </span>
-                    {% endif %}
-                </div>
-            </a>
+                    <p class="text-[10px] text-slate-400 font-mono truncate">ID: {{ rfq.id }}</p>
+                </a>
+                <button class="quick-bid-btn mt-2 w-full py-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 transition"
+                    data-rfq-id="{{ rfq.id }}"
+                    data-rfq-title="{{ rfq.title if rfq.title else rfq.product_category }}"
+                    data-rfq-qty="{{ rfq.quantity }}">
+                    + Place Bid on This RFQ
+                </button>
+                <button class="mt-1 w-full py-1.5 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition flex items-center justify-center gap-1"
+                    onclick="openShippingCalculator('{{ rfq.id }}', '{{ rfq.destination_port or '' }}', {{ rfq.quantity or 0 }}, '{{ (rfq.title if rfq.title else rfq.product_category) | replace("'", "") }}')">
+                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                    </svg>
+                    Calculate Shipping
+                </button>
+            </div>
             {% endfor %}
             {% endif %}
+        </div>
 
+        <!-- My Orders Panel -->
+        <div id="panel-orders" class="hidden overflow-y-auto flex-1 p-3 space-y-3">
+            {% if not orders %}
+            <div class="text-center py-10">
+                <svg class="h-10 w-10 text-slate-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                </svg>
+                <p class="text-sm text-slate-500">No active orders yet.</p>
+                <p class="text-xs text-slate-400 mt-1">Orders appear here after a buyer pays your bid.</p>
+            </div>
+            {% else %}
+            {% for order in orders %}
+            {% set p = order.payment %}
+            {% set rfq = order.rfq %}
+            {% set bid = order.bid %}
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 space-y-3">
+                <!-- Order Header -->
+                <div class="flex items-start justify-between">
+                    <div>
+                        <p class="font-bold text-slate-800 text-sm line-clamp-1">{{ rfq.title if rfq else 'Order' }}</p>
+                        <p class="text-xs text-slate-400 font-mono mt-0.5">{{ p.transaction_id if p else bid.id[:12] + '…' }}</p>
+                    </div>
+                    <!-- Status Badge -->
+                    {% if not p %}
+                        {% if bid.status == 'ACCEPTED' %}
+                        <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold flex-shrink-0">ACCEPTED</span>
+                        {% elif bid.status == 'CONFIRMED' %}
+                        <span class="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold flex-shrink-0">CONFIRMED</span>
+                        {% endif %}
+                    {% elif p.status == 'PAID_IN_ESCROW' %}
+                    <span class="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold flex-shrink-0">PAID</span>
+                    {% elif p.status == 'WORK_IN_PROGRESS' %}
+                    <span class="px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 text-[10px] font-bold flex-shrink-0">IN PROGRESS</span>
+                    {% elif p.status == 'SENT_FOR_DELIVERY' %}
+                    <span class="px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[10px] font-bold flex-shrink-0">DELIVERED</span>
+                    {% elif p.status == 'RELEASED' %}
+                    <span class="px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-[10px] font-bold flex-shrink-0">RELEASED</span>
+                    {% endif %}
+                </div>
+
+                <!-- Amount -->
+                <div class="bg-slate-50 rounded-lg p-2.5 flex items-center justify-between">
+                    <div>
+                        <p class="text-[10px] text-slate-500 uppercase font-bold">Your Bid</p>
+                        <p class="font-extrabold text-green-700 text-base">৳ {{ "{:,.2f}".format(bid.bid_price * (rfq.quantity if rfq else 1)) }}</p>
+                        <p class="text-[10px] text-slate-400">৳ {{ "{:,.2f}".format(bid.bid_price) }} / unit</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-[10px] text-slate-500 uppercase font-bold">Qty</p>
+                        <p class="font-bold text-slate-800 text-sm">{{ "{:,}".format(rfq.quantity if rfq else 0) }} pcs</p>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                {% if not p %}
+                    {% if bid.status == 'ACCEPTED' %}
+                    <!-- Buyer accepted — supplier must confirm they can fulfill -->
+                    <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-2.5 text-center mb-2">
+                        <p class="text-xs font-bold text-emerald-700">🎉 Buyer accepted your bid!</p>
+                        <p class="text-[10px] text-emerald-600 mt-0.5">Confirm you can fulfill this order to unlock payment.</p>
+                    </div>
+                    <button onclick="confirmOrder('{{ bid.id }}', '{{ bid.rfq_id }}')"
+                        class="w-full py-2 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition flex items-center justify-center gap-1.5">
+                        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        Confirm Order
+                    </button>
+                    {% elif bid.status == 'CONFIRMED' %}
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-2.5 text-center">
+                        <p class="text-xs font-bold text-blue-700">✓ Order Confirmed</p>
+                        <p class="text-[10px] text-blue-500 mt-0.5">Waiting for buyer to complete payment.</p>
+                    </div>
+                    {% endif %}
+                {% elif p.status == 'PAID_IN_ESCROW' %}
+                <button onclick="startWork('{{ p.payment_id }}')"
+                    class="w-full py-2 rounded-lg text-xs font-bold bg-yellow-500 hover:bg-yellow-600 text-white transition flex items-center justify-center gap-1.5">
+                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    Start Working on Order
+                </button>
+
+                {% elif p.status == 'WORK_IN_PROGRESS' %}
+                <div class="flex items-center gap-1.5 text-yellow-600 text-xs font-semibold mb-1">
+                    <span class="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></span>
+                    Work in progress…
+                </div>
+                <button onclick="sendDelivery('{{ p.payment_id }}')"
+                    class="w-full py-2 rounded-lg text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white transition flex items-center justify-center gap-1.5">
+                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
+                    </svg>
+                    Mark as Sent for Delivery
+                </button>
+
+                {% elif p.status == 'SENT_FOR_DELIVERY' %}
+                <div class="bg-purple-50 border border-purple-200 rounded-lg p-2.5 text-center">
+                    <p class="text-xs font-bold text-purple-700">📦 Sent for Delivery</p>
+                    <p class="text-[10px] text-purple-500 mt-0.5">Waiting for admin to release your payment.</p>
+                </div>
+
+                {% elif p.status == 'RELEASED' %}
+                <div class="bg-green-50 border border-green-200 rounded-lg p-2.5 text-center">
+                    <p class="text-xs font-bold text-green-700">✓ Payment Released</p>
+                    <p class="text-[10px] text-green-500 mt-0.5">৳ earnings released to you.</p>
+                </div>
+                {% endif %}
+
+                {% if p %}
+                <a href="/escrow/tracker/{{ p.payment_id }}" class="block text-center text-[10px] font-semibold text-blue-500 hover:text-blue-700">
+                    View Escrow Tracker →
+                </a>
+                {% endif %}
+            </div>
+            {% endfor %}
+            {% endif %}
         </div>
     </div>
 
-
-    <!-- MAIN WORKSPACE: The RFQ Brief (75%) -->
+    <!-- MAIN WORKSPACE -->
     <div class="flex-1 flex flex-col relative h-full overflow-hidden bg-white">
-
-        <!-- Header area for the selected RFQ -->
         <div class="p-6 border-b border-slate-200 shrink-0 bg-white z-10">
-            <div class="flex justify-between items-start max-w-5xl mx-auto">
-                <div>
-                    <!-- Breadcrumb -->
-                    <div class="text-xs font-medium text-slate-500 mb-2 flex items-center gap-2">
-                        <span>Dashboard</span>
-                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7">
-                            </path>
-                        </svg>
-                        <span>Incoming Orders</span>
-                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7">
-                            </path>
-                        </svg>
-                        <span class="text-slate-800">RFQ Brief</span>
-                    </div>
+            <div class="max-w-5xl mx-auto">
+                <h1 class="text-2xl font-bold text-slate-900">Supplier Dashboard</h1>
+                <p class="text-sm text-slate-500 mt-1">Browse open RFQs and manage your active orders.</p>
+            </div>
+        </div>
 
-                    <h1 class="text-2xl md:text-3xl font-bold text-slate-900 mb-4">
-                        RFQ Brief: Autumn 2024 Cotton Tee <!-- Placeholder until JS loads data -->
-                    </h1>
-
-                    <div class="flex flex-wrap gap-4">
-                        <!-- Buyer Profile Card -->
-                        <div class="bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 flex items-center gap-3">
-                            <div
-                                class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold text-sm">
-                                CH</div>
-                            <div>
-                                <p class="text-[10px] text-slate-500 font-bold uppercase">Buyer Profile</p>
-                                <p class="text-sm font-semibold text-slate-800">Chic Threads | UK | 15 Orders</p>
-                            </div>
-                        </div>
-
-                        <!-- Match Score -->
-                        <div
-                            class="bg-emerald-50 border border-emerald-100 rounded-lg px-4 py-2 flex items-center gap-3">
-                            <div
-                                class="w-8 h-8 rounded-full border-4 border-emerald-500 flex items-center justify-center">
-                                <span class="text-[10px] font-bold text-emerald-700">95%</span>
-                            </div>
-                            <div>
-                                <p class="text-[10px] text-emerald-600 font-bold uppercase">Match Score</p>
-                                <p class="text-sm font-bold text-emerald-800">High Compatibility</p>
-                            </div>
-                        </div>
-
-                        <!-- Status -->
-                        <div class="bg-blue-50 border border-blue-100 rounded-lg px-4 py-2 flex items-center gap-3">
-                            <div class="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
-                            <div>
-                                <p class="text-[10px] text-blue-600 font-bold uppercase">Status</p>
-                                <p class="text-sm font-bold text-blue-800">ACTIVE Bidding</p>
-                            </div>
-                        </div>
-                    </div>
+        <div class="flex-1 overflow-y-auto p-6">
+            <div class="max-w-5xl mx-auto pb-32">
+                {% if success is defined and success %}
+                <div class="mb-6 bg-green-50 border border-green-200 rounded-xl p-4">
+                    <p class="text-sm font-bold text-green-700">{{ message }}</p>
+                </div>
+                {% endif %}
+                <div class="bg-slate-50 rounded-xl border border-slate-200 p-8 text-center">
+                    <svg class="w-16 h-16 text-slate-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                    </svg>
+                    <h3 class="text-lg font-bold text-slate-700 mb-2">Select an RFQ or manage your orders</h3>
+                    <p class="text-sm text-slate-500">Use the <strong>Browse RFQs</strong> tab to find opportunities, or the <strong>My Orders</strong> tab to manage active work.</p>
                 </div>
             </div>
         </div>
 
-        <!-- Scrollable content area for the Brief -->
-        <div class="flex-1 overflow-y-auto p-6 scroll-smooth">
-            <div class="max-w-5xl mx-auto space-y-8 pb-32"> <!-- Padding bottom for floating widget -->
-
-                <!-- Section B: Visual Assets -->
-                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                    <div class="px-5 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-                        <h2 class="font-bold text-slate-800 text-lg">Visual Assets</h2>
-                    </div>
-
-                    <div class="p-5 grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <!-- Thumbnails (Mocked for visual structure) -->
-                        <div
-                            class="group relative bg-slate-100 rounded-xl overflow-hidden aspect-square border border-slate-200 flex flex-col items-center justify-center">
-                            <svg class="w-16 h-16 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="1.5">
-                                <path d="M20 9v11a2 2 0 01-2 2H6a2 2 0 01-2-2V9" />
-                                <path d="M9 22V12h6v10m-1.5-13V2l3-2h-9l3 2v7.5" />
-                            </svg>
-                            <span class="absolute bottom-2 left-3 text-xs font-medium text-slate-700">Front View
-                                Sketch</span>
-                        </div>
-
-                        <div
-                            class="group relative bg-slate-200 rounded-xl overflow-hidden aspect-square border border-slate-200">
-                            <div class="w-full h-full bg-gradient-to-br from-slate-200 to-slate-400"></div>
-                            <span
-                                class="absolute bottom-2 left-3 text-xs font-medium text-white shadow-sm drop-shadow-md">3D
-                                Product Render</span>
-                        </div>
-
-                        <div
-                            class="group relative bg-[#e3e3e3] rounded-xl overflow-hidden aspect-square border border-slate-200">
-                            <div
-                                class="w-full h-full bg-[#eaeaea] bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIi8+CjxyZWN0IHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiNjY2MiLz4KPC9zdmc+')] opacity-50 mix-blend-multiply">
-                            </div>
-                            <span
-                                class="absolute bottom-2 left-3 text-xs font-medium text-slate-700 bg-white/70 px-1 rounded">Fabric
-                                Detail</span>
-                        </div>
-
-                        <!-- Pantone Palette Mock -->
-                        <div class="bg-slate-50 rounded-xl border border-slate-200 p-3 flex flex-col justify-between">
-                            <div class="grid grid-cols-3 gap-2">
-                                <div class="w-full aspect-square rounded-full bg-[#1b4478] shadow-sm"></div>
-                                <div class="w-full aspect-square rounded-full bg-[#41403c] shadow-sm"></div>
-                                <div class="w-full aspect-square rounded-full bg-[#c29c69] shadow-sm"></div>
-                                <div class="col-span-2 h-6 rounded bg-[#2c4059] shadow-sm"></div>
-                                <div class="col-span-1 h-6 rounded bg-[#e3e3e3] shadow-sm"></div>
-                            </div>
-                            <span class="text-xs font-bold text-slate-700 mt-2 text-center">Extracted Palette</span>
-                        </div>
-                    </div>
-
-                    <!-- Tech Pack Button -->
-                    <div class="px-5 pb-5">
-                        <button
-                            class="w-full flex items-center justify-center gap-2 bg-brand-primary hover:bg-brand-dark text-white font-bold py-3 rounded-lg shadow-sm transition">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
-                            </svg>
-                            Download Full Tech Pack (.PDF)
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Section C: Technical Grid -->
-                <div>
-                    <h2 class="font-bold text-slate-800 text-lg mb-4">Technical Grid</h2>
-
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-
-                        <!-- Col 1: Fabric Spec -->
-                        <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 h-full">
-                            <h3 class="font-bold text-slate-800 text-sm mb-4 border-b border-slate-100 pb-2">Fabric
-                                Specifications</h3>
-                            <div
-                                class="inline-block bg-[#1b4478] text-white px-3 py-1.5 rounded text-sm font-medium mb-3">
-                                100% Cotton, 180 GSM
-                            </div>
-                            <div class="flex items-center gap-1 text-sm text-slate-500">
-                                <span>(Standard Weight)</span>
-                                <svg class="w-4 h-4 text-slate-400 cursor-help" fill="none" stroke="currentColor"
-                                    viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                </svg>
-                            </div>
-
-                            <div class="mt-6">
-                                <h4 class="text-xs font-bold text-slate-500 uppercase mb-2">Required Certs</h4>
-                                <div class="flex flex-wrap gap-2">
-                                    <span
-                                        class="text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-1 rounded">OEKO-TEX</span>
-                                    <span
-                                        class="text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-1 rounded">GOTS</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Col 2: Quantity Breakup -->
-                        <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-0 h-full overflow-hidden">
-                            <h3 class="font-bold text-slate-800 text-sm p-5 border-b border-slate-100 bg-slate-50">
-                                Quantity & Size Breakup</h3>
-                            <table class="w-full text-sm text-left text-slate-600">
-                                <thead class="text-xs text-slate-500 bg-white border-b border-slate-200 uppercase">
-                                    <tr>
-                                        <th class="px-4 py-2 font-bold">Size</th>
-                                        <th class="px-4 py-2 font-bold">Color</th>
-                                        <th class="px-4 py-2 font-bold text-right">Quantity</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr class="border-b border-slate-100">
-                                        <td class="px-4 py-2 font-medium">S</td>
-                                        <td class="px-4 py-2">Black</td>
-                                        <td class="px-4 py-2 text-right font-medium">1,000</td>
-                                    </tr>
-                                    <tr class="border-b border-slate-100">
-                                        <td class="px-4 py-2 font-medium">M</td>
-                                        <td class="px-4 py-2">White</td>
-                                        <td class="px-4 py-2 text-right font-medium">1,000</td>
-                                    </tr>
-                                    <tr class="border-b border-slate-100">
-                                        <td class="px-4 py-2 font-medium">L</td>
-                                        <td class="px-4 py-2">Navy</td>
-                                        <td class="px-4 py-2 text-right font-medium">1,000</td>
-                                    </tr>
-                                    <tr class="border-b border-slate-200 bg-slate-50">
-                                        <td class="px-4 py-3 font-bold text-slate-800" colspan="2">XL</td>
-                                        <td class="px-4 py-3 text-right font-bold text-slate-800 text-base">Total:
-                                            10,000</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <!-- Col 3: Logistics -->
-                        <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 h-full relative">
-                            <h3 class="font-bold text-slate-800 text-sm mb-4 border-b border-slate-100 pb-2">Logistics
-                            </h3>
-
-                            <dl class="space-y-4">
-                                <div>
-                                    <dt class="text-xs font-bold text-slate-500 uppercase mb-1">Target Delivery</dt>
-                                    <dd class="text-sm font-semibold text-slate-800">Oct 15, 2024</dd>
-                                </div>
-                                <div>
-                                    <dt class="text-xs font-bold text-slate-500 uppercase mb-1">Requested Incoterms</dt>
-                                    <dd class="text-sm font-semibold text-slate-800">FOB</dd>
-                                </div>
-                                <div>
-                                    <dt class="text-xs font-bold text-slate-500 uppercase mb-1">Destination</dt>
-                                    <dd class="text-sm font-semibold text-slate-800">Port of LA</dd>
-                                </div>
-                            </dl>
-
-                            <!-- background decoration -->
-                            <svg class="absolute bottom-2 right-2 w-16 h-16 text-slate-100 -z-1" fill="none"
-                                stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1"
-                                    d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z">
-                                </path>
-                            </svg>
-                        </div>
-
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- FLOATING WIDGET: Smart Quoting -->
-        <div id="quoting-widget"
-            class="fixed top-[calc(100vh-450px)] right-8 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200/60 overflow-hidden z-50">
-            <div id="quoting-widget-header"
-                class="p-4 bg-slate-800 text-white border-b border-slate-700 cursor-move flex items-center justify-between select-none">
+        <!-- FLOATING BID WIDGET -->
+        <div id="quoting-widget" class="fixed bottom-8 right-8 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200/60 overflow-hidden z-50">
+            <div id="quoting-widget-header" class="p-4 bg-slate-800 text-white border-b border-slate-700 cursor-move flex items-center justify-between select-none">
                 <h3 class="font-bold text-base flex items-center gap-2">
-                    My Bid Calculator
+                    Place a Bid
                     <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z">
-                        </path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
                 </h3>
-                <button type="button" id="quoting-widget-toggle"
-                    class="text-slate-400 hover:text-white transition cursor-pointer">
+                <button type="button" id="quoting-widget-toggle" class="text-slate-400 hover:text-white transition">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                     </svg>
                 </button>
             </div>
@@ -368,14 +260,18 @@
                             class="pl-7 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                             placeholder="0.00">
                     </div>
-                </div>
 
-                <!-- Fabric Cost -->
+            <div id="quoting-widget-form" class="p-5 space-y-4">
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <p class="text-xs font-bold text-blue-600 uppercase mb-1">Bidding on RFQ</p>
+                    <p id="selected-rfq-title" class="text-sm font-bold text-slate-800">← Click "+ Place Bid" on a card</p>
+                    <input type="hidden" id="bid-rfq-id" value="">
+                </div>
                 <div>
-                    <label class="block text-xs font-bold text-slate-600 mb-1">Fabric/Material Cost per piece</label>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">Your Bid Price per Unit (BDT)</label>
                     <div class="relative">
                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <span class="text-slate-500 sm:text-sm">$</span>
+                            <span class="text-slate-500 font-bold">৳</span>
                         </div>
                         <input type="number" step="0.01" id="fabric_cost"
                             class="pl-7 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
@@ -386,16 +282,15 @@
                 <hr class="border-slate-100">
 
                 <!-- Auto-calculated total -->
-                <div class="flex justify-between items-center bg-slate-50 p-2 rounded border border-slate-100">
-                    <span class="text-sm font-bold text-slate-700">Total Unit Price</span>
-                    <div class="relative w-24">
-                        <div class="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
-                            <span class="text-slate-500 text-sm font-bold">$</span>
-                        </div>
-                        <input type="number" step="0.01" id="total_price" readonly
-                            class="pl-6 w-full bg-transparent border-none text-right font-extrabold text-slate-900 text-lg focus:ring-0 p-0"
-                            placeholder="0.00">
+
+                        <input type="number" step="0.01" id="bid-price-input" min="1"
+                            class="pl-7 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
+                            placeholder="e.g. 450.00">
                     </div>
+                </div>
+                <div class="flex justify-between items-center bg-slate-50 p-2 rounded border border-slate-100">
+                    <span class="text-sm font-bold text-slate-700">Total Estimate</span>
+                    <span id="bid-total-display" class="font-extrabold text-slate-900">৳ 0.00</span>
                 </div>
 
                 <!-- Lead Time -->
@@ -428,11 +323,23 @@
                     </svg>
                     Get AI Bid Recommendation
                 </a>
+
+                <button type="button" id="submit-bid-btn"
+                    class="w-full flex items-center justify-center gap-2 bg-brand-primary text-white font-bold py-3 rounded-lg shadow-sm hover:bg-brand-dark transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                    Submit Bid
+                </button>
+                <div id="bid-success" class="hidden bg-green-50 border border-green-200 rounded-lg p-3 text-center">
+                    <p class="text-sm font-bold text-green-700">✓ Bid submitted! Buyer can now pay.</p>
+                </div>
+                <div id="bid-error" class="hidden bg-red-50 border border-red-200 rounded-lg p-3">
+                    <p class="text-sm font-bold text-red-700" id="bid-error-msg">Error submitting bid.</p>
+                </div>
             </div>
         </div>
-
     </div>
-
 </div>
 
 <script>
@@ -442,110 +349,97 @@
         const fabricInput = document.getElementById('fabric_cost');
         const totalInput = document.getElementById('total_price');
 
-        function calc() {
-            const cm = parseFloat(cmInput.value) || 0;
-            const fab = parseFloat(fabricInput.value) || 0;
-            totalInput.value = (cm + fab).toFixed(2);
-        }
+// Tab switching
+function switchTab(tab) {
+    document.getElementById('panel-rfqs').classList.toggle('hidden', tab !== 'rfqs');
+    document.getElementById('panel-orders').classList.toggle('hidden', tab !== 'orders');
+    document.getElementById('tab-rfqs').className = tab === 'rfqs'
+        ? 'flex-1 py-3 text-sm font-bold text-blue-600 border-b-2 border-blue-600 transition-colors'
+        : 'flex-1 py-3 text-sm font-bold text-slate-400 border-b-2 border-transparent hover:text-slate-700 transition-colors';
+    document.getElementById('tab-orders').className = tab === 'orders'
+        ? 'flex-1 py-3 text-sm font-bold text-blue-600 border-b-2 border-blue-600 transition-colors'
+        : 'flex-1 py-3 text-sm font-bold text-slate-400 border-b-2 border-transparent hover:text-slate-700 transition-colors';
+}
 
-        if (cmInput && fabricInput) {
-            cmInput.addEventListener('input', calc);
-            fabricInput.addEventListener('input', calc);
-        }
+// Order actions
+async function confirmOrder(bidId, rfqId) {
+    if (!confirm('Confirm you can fulfill this order? The buyer will be notified and can proceed to payment.')) return;
+    const res = await fetch('/api/bid/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bid_id: bidId, rfq_id: rfqId })
+    });
+    const data = await res.json();
+    if (data.success) { window.location.reload(); }
+    else { alert(data.detail || 'Error confirming order.'); }
+}
 
-        // Widget Logic: Drag and Minimize
-        const widget = document.getElementById('quoting-widget');
-        const header = document.getElementById('quoting-widget-header');
-        const toggleBtn = document.getElementById('quoting-widget-toggle');
-        const formBody = document.getElementById('quoting-widget-form');
+async function startWork(paymentId) {
+    if (!confirm('Confirm you are starting work on this order?')) return;
+    const res = await fetch('/api/order/start-work', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payment_id: paymentId })
+    });
+    const data = await res.json();
+    if (data.success) { window.location.reload(); }
+    else { alert(data.detail || 'Error'); }
+}
 
-        // Minimize
-        toggleBtn.addEventListener('click', (e) => {
-            e.stopPropagation(); // don't trigger drag
-            formBody.classList.toggle('hidden');
-            const svg = toggleBtn.querySelector('svg');
-            if (formBody.classList.contains('hidden')) {
-                svg.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>';
-            } else {
-                svg.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>';
-            }
+async function sendDelivery(paymentId) {
+    if (!confirm('Confirm you have sent the order for delivery? Admin will then release your payment.')) return;
+    const res = await fetch('/api/order/send-delivery', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payment_id: paymentId })
+    });
+    const data = await res.json();
+    if (data.success) { window.location.reload(); }
+    else { alert(data.detail || 'Error'); }
+}
+
+// Bid widget
+document.addEventListener('DOMContentLoaded', () => {
+    const rfqIdInput = document.getElementById('bid-rfq-id');
+    const rfqTitleEl = document.getElementById('selected-rfq-title');
+    const priceInput = document.getElementById('bid-price-input');
+    const totalDisplay = document.getElementById('bid-total-display');
+    let selectedQty = 1;
+
+    document.querySelectorAll('.quick-bid-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault(); e.stopPropagation();
+            rfqIdInput.value = btn.dataset.rfqId;
+            rfqTitleEl.textContent = btn.dataset.rfqTitle;
+            selectedQty = parseInt(btn.dataset.rfqQty) || 1;
+            document.getElementById('bid-success').classList.add('hidden');
+            document.getElementById('bid-error').classList.add('hidden');
+            priceInput.focus();
         });
+    });
 
-        // Draggable
-        let isDragging = false;
-        let currentX;
-        let currentY;
-        let initialX;
-        let initialY;
-        let xOffset = 0;
-        let yOffset = 0;
+    priceInput.addEventListener('input', () => {
+        const price = parseFloat(priceInput.value) || 0;
+        totalDisplay.textContent = '৳ ' + (price * selectedQty).toLocaleString('en-US', {minimumFractionDigits: 2});
+    });
 
-        header.addEventListener('mousedown', dragStart);
-
-        function dragStart(e) {
-            if (e.target === toggleBtn || toggleBtn.contains(e.target)) return;
-            initialX = e.clientX - xOffset;
-            initialY = e.clientY - yOffset;
-            isDragging = true;
-            document.addEventListener('mousemove', drag);
-            document.addEventListener('mouseup', dragEnd);
-        }
-
-        function drag(e) {
-            if (isDragging) {
-                e.preventDefault();
-
-                // Calculate the proposed new position
-                let newX = e.clientX - initialX;
-                let newY = e.clientY - initialY;
-
-                // Calculate boundaries
-                const widgetRect = widget.getBoundingClientRect();
-                const viewportWidth = window.innerWidth;
-                const viewportHeight = window.innerHeight;
-
-                // Get the current computed style to find where the box actually starts
-                // since tailwind handles its initial positioning via absolute right/bottom
-                const computedStyle = window.getComputedStyle(widget);
-
-                // Max movement in X direction (can't go further left than the screen width minus its absolute right position offset)
-                // Max movement in Y direction (can't go further up than the screen height minus its absolute bottom position offset)
-
-                // The easiest solid boundary check when using transforms is to check the real bounding client rect
-                // against the viewport on each move pixel.
-
-                // Calculate theoretical next rect
-                const nextRectLeft = widgetRect.left + (newX - xOffset);
-                const nextRectRight = widgetRect.right + (newX - xOffset);
-                const nextRectTop = widgetRect.top + (newY - yOffset);
-                const nextRectBottom = widgetRect.bottom + (newY - yOffset);
-
-                // X Bounds Check
-                if (nextRectLeft < 0) {
-                    newX = xOffset - widgetRect.left; // Snap to left edge
-                } else if (nextRectRight > viewportWidth) {
-                    newX = xOffset + (viewportWidth - widgetRect.right); // Snap to right edge
-                }
-
-                // Y Bounds Check
-                if (nextRectTop < 85) {
-                    newY = yOffset + (85 - widgetRect.top); // Snap to top edge (below navbar)
-                } else if (nextRectBottom > viewportHeight) {
-                    newY = yOffset + (viewportHeight - widgetRect.bottom); // Snap to bottom edge
-                }
-
-                currentX = newX;
-                currentY = newY;
-                xOffset = currentX;
-                yOffset = currentY;
-
-                setTranslate(currentX, currentY, widget);
-            }
-        }
-
-        function setTranslate(xPos, yPos, el) {
-            el.style.transform = `translate3d(${xPos}px, ${yPos}px, 0)`;
-        }
+    document.getElementById('submit-bid-btn').addEventListener('click', async () => {
+        const rfqId = rfqIdInput.value.trim();
+        const price = parseFloat(priceInput.value);
+        document.getElementById('bid-success').classList.add('hidden');
+        document.getElementById('bid-error').classList.add('hidden');
+        if (!rfqId) { document.getElementById('bid-error-msg').textContent = 'Click "+ Place Bid" on an RFQ card first.'; document.getElementById('bid-error').classList.remove('hidden'); return; }
+        if (!price || price <= 0) { document.getElementById('bid-error-msg').textContent = 'Enter a valid bid price.'; document.getElementById('bid-error').classList.remove('hidden'); return; }        const btn = document.getElementById('submit-bid-btn');
+        btn.disabled = true; btn.textContent = 'Submitting…';
+        try {
+            const res = await fetch('/api/bid/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rfq_id: rfqId, bid_price: price }) });
+            const data = await res.json();
+            if (data.success) { document.getElementById('bid-success').classList.remove('hidden'); priceInput.value = ''; totalDisplay.textContent = '৳ 0.00'; }
+            else { document.getElementById('bid-error-msg').textContent = data.detail || 'Failed.'; document.getElementById('bid-error').classList.remove('hidden'); }
+        } catch(e) { document.getElementById('bid-error-msg').textContent = 'Network error.'; document.getElementById('bid-error').classList.remove('hidden'); }
+        btn.disabled = false;
+        btn.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> Submit Bid';
+    });
 
         function dragEnd(e) {
             initialX = currentX;
@@ -578,7 +472,25 @@
             });
         }
 
+    // Widget minimize/drag
+    const widget = document.getElementById('quoting-widget');
+    const header = document.getElementById('quoting-widget-header');
+    const toggleBtn = document.getElementById('quoting-widget-toggle');
+    const formBody = document.getElementById('quoting-widget-form');
+    toggleBtn.addEventListener('click', (e) => { e.stopPropagation(); formBody.classList.toggle('hidden'); });
+    let isDragging = false, initialX, initialY, xOffset = 0, yOffset = 0;
+    header.addEventListener('mousedown', (e) => {
+        if (e.target === toggleBtn || toggleBtn.contains(e.target)) return;
+        initialX = e.clientX - xOffset; initialY = e.clientY - yOffset; isDragging = true;
+        document.addEventListener('mousemove', onDrag);
+        document.addEventListener('mouseup', () => { isDragging = false; document.removeEventListener('mousemove', onDrag); });
     });
+    function onDrag(e) {
+        if (!isDragging) return; e.preventDefault();
+        xOffset = e.clientX - initialX; yOffset = e.clientY - initialY;
+        widget.style.transform = `translate3d(${xOffset}px, ${yOffset}px, 0)`;
+    }
+});
 </script>
 
 
@@ -737,5 +649,7 @@
     loadCapacitySummary();
 })();
 </script>
+
+{% include "shipping_calculator_modal.html" %}
 
 {% endblock %}

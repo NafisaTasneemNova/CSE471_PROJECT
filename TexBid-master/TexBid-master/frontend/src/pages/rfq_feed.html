@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Supplier Dashboard (Live Feed) - TexBid{% endblock %}
+{% block title %}Browse RFQs - TexBid{% endblock %}
 
 {% block content %}
 <div class="min-h-screen bg-slate-50 pt-20 pb-12">
@@ -64,43 +64,85 @@
                     class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-brand-primary/5 to-transparent rounded-bl-full -z-10 transition-transform duration-500 group-hover:scale-150 group-hover:bg-brand-primary/10">
                 </div>
 
-                <div class="flex justify-between items-start mb-4">
+                <!-- RFQ Title -->
+                <div class="mb-3">
+                    <a href="/rfq/{{ rfq.id }}" class="font-extrabold text-slate-900 text-base leading-tight hover:text-brand-primary transition line-clamp-2">
+                        {{ rfq.title if rfq.title else (rfq.product_category + ' Order') }}
+                    </a>
+                    <p class="text-[10px] text-slate-400 font-mono mt-1">ID: {{ rfq.id[:12] }}...</p>
+                </div>
+
+                <!-- Category & Urgency -->
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-1 bg-brand-light/10 text-brand-primary rounded">
+                        {{ rfq.product_category }}
+                    </span>
+                    <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded {{ 'bg-red-50 text-red-600' if rfq.urgency_level == 'HIGH' else ('bg-orange-50 text-orange-600' if rfq.urgency_level == 'MEDIUM' else 'bg-blue-50 text-blue-600') }}">
+                        {{ rfq.urgency_level if rfq.urgency_level else 'STANDARD' }}
+                    </span>
+                </div>
+
+                <!-- Key Details Grid -->
+                <div class="bg-slate-50 rounded-lg p-3 mb-3 grid grid-cols-2 gap-3">
                     <div>
-                        <span
-                            class="text-[10px] font-bold uppercase tracking-wider px-2 py-1 bg-brand-light/10 text-brand-primary rounded mb-2 inline-block">{{
-                            rfq.product_category }}</span>
-                        <h4 class="font-extrabold text-slate-900 text-lg leading-tight">{{ rfq.quantity | int }} Units
-                        </h4>
+                        <p class="text-[10px] text-slate-500 font-bold uppercase">Quantity</p>
+                        <p class="font-extrabold text-slate-900 text-base">{{ "{:,}".format(rfq.quantity | int) }}</p>
+                        <p class="text-[9px] text-slate-400">units</p>
                     </div>
                     {% if rfq.target_price %}
-                    <div class="text-right">
-                        <span class="block text-[10px] text-slate-400 font-bold uppercase">Target ({{ rfq.incoterms
-                            }})</span>
-                        <span class="font-extrabold text-brand-accent text-lg">${{ "%.2f"|format(rfq.target_price)
-                            }}</span>
+                    <div>
+                        <p class="text-[10px] text-slate-500 font-bold uppercase">Target Price</p>
+                        <p class="font-extrabold text-brand-accent text-base">${{ "%.2f"|format(rfq.target_price) }}</p>
+                        <p class="text-[9px] text-slate-400">per unit ({{ rfq.incoterm or rfq.incoterms or 'FOB' }})</p>
                     </div>
                     {% else %}
-                    <div class="text-right">
-                        <span class="block text-[10px] text-slate-400 font-bold uppercase">Target</span>
-                        <span class="font-extrabold text-slate-600 text-sm">Open Bid</span>
+                    <div>
+                        <p class="text-[10px] text-slate-500 font-bold uppercase">Target Price</p>
+                        <p class="font-bold text-slate-600 text-sm">Open Bid</p>
+                        <p class="text-[9px] text-slate-400">negotiable</p>
                     </div>
                     {% endif %}
                 </div>
 
-                <p class="text-slate-600 text-sm font-medium mb-4 flex-grow"><span
-                        class="font-bold text-slate-800">Fabric:</span> {{ rfq.fabric_type }}</p>
+                <!-- Fabric & Specs -->
+                <div class="space-y-2 mb-3 text-xs">
+                    <div class="flex items-start gap-2">
+                        <span class="text-slate-500 font-semibold min-w-[60px]">Fabric:</span>
+                        <span class="text-slate-800 font-bold">{{ rfq.fabric_type }}</span>
+                    </div>
+                    {% if rfq.fabric_gsm %}
+                    <div class="flex items-start gap-2">
+                        <span class="text-slate-500 font-semibold min-w-[60px]">GSM:</span>
+                        <span class="text-slate-800 font-bold">{{ rfq.fabric_gsm }}</span>
+                    </div>
+                    {% endif %}
+                    {% if rfq.target_delivery_date %}
+                    <div class="flex items-start gap-2">
+                        <span class="text-slate-500 font-semibold min-w-[60px]">Delivery:</span>
+                        <span class="text-slate-800 font-bold">{{ rfq.target_delivery_date }}</span>
+                    </div>
+                    {% endif %}
+                    {% if rfq.destination_port %}
+                    <div class="flex items-start gap-2">
+                        <span class="text-slate-500 font-semibold min-w-[60px]">Port:</span>
+                        <span class="text-slate-800 font-bold">{{ rfq.destination_port }}</span>
+                    </div>
+                    {% endif %}
+                </div>
 
+                <!-- Certifications -->
                 {% if rfq.certifications_required %}
-                <div class="mb-5 flex flex-wrap gap-1">
+                <div class="mb-3 flex flex-wrap gap-1">
                     {% for cert in rfq.certifications_required %}
-                    <span
-                        class="text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded">{{
-                        cert }}</span>
+                    <span class="text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded">
+                        {{ cert }}
+                    </span>
                     {% endfor %}
                 </div>
                 {% endif %}
 
-                <div class="pt-4 border-t border-slate-100 flex justify-between items-center mt-auto">
+                <!-- Deadline -->
+                <div class="pt-3 border-t border-slate-100 flex justify-between items-center mt-auto">
                     <div class="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
                         <svg class="w-4 h-4 text-brand-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -108,7 +150,27 @@
                         </svg>
                         Deadline: {% if rfq.deadline %}{{ rfq.deadline.strftime('%Y-%m-%d') }}{% else %}N/A{% endif %}
                     </div>
+                    <a href="/rfq/{{ rfq.id }}" class="text-xs font-bold text-blue-600 hover:text-blue-800 transition">
+                        View Full Details →
+                    </a>
+                </div>
 
+                <!-- Action Buttons -->
+                <div class="mt-3 flex gap-2">
+                    <button class="quick-bid-btn flex-1 py-2 rounded-lg text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 transition"
+                        data-rfq-id="{{ rfq.id }}"
+                        data-rfq-title="{{ (rfq.title if rfq.title else rfq.product_category) | replace("'", "") }}"
+                        data-rfq-qty="{{ rfq.quantity }}">
+                        + Place Bid
+                    </button>
+                    <button
+                        onclick="openShippingCalculator('{{ rfq.id }}', '{{ rfq.destination_port or '' }}', {{ rfq.quantity or 0 }}, '{{ (rfq.title if rfq.title else rfq.product_category) | replace("'", "") }}', '{{ rfq.shipping_method or 'SEA' }}', '{{ rfq.incoterm or rfq.incoterms or 'FOB' }}')"
+                        class="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-indigo-50 text-indigo-700 text-xs font-bold rounded-lg hover:bg-indigo-100 transition border border-indigo-200">
+                        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                        </svg>
+                        Calculate
+                    </button>
                 </div>
             </div>
             {% endfor %}
@@ -117,4 +179,171 @@
         </div>
     </div>
 </div>
+
+<!-- FLOATING BID WIDGET -->
+<div id="quoting-widget" class="fixed bottom-8 right-8 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200/60 overflow-hidden z-50">
+    <div id="quoting-widget-header" class="p-4 bg-slate-800 text-white border-b border-slate-700 cursor-move flex items-center justify-between select-none">
+        <h3 class="font-bold text-base flex items-center gap-2">
+            Place a Bid
+            <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+        </h3>
+        <button type="button" id="quoting-widget-toggle" class="text-slate-400 hover:text-white transition">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+        </button>
+    </div>
+    <div id="quoting-widget-form" class="p-5 space-y-4">
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <p class="text-xs font-bold text-blue-600 uppercase mb-1">Bidding on RFQ</p>
+            <p id="selected-rfq-title" class="text-sm font-bold text-slate-800">← Click "+ Place Bid" on a card</p>
+            <input type="hidden" id="bid-rfq-id" value="">
+        </div>
+        <div>
+            <label class="block text-xs font-bold text-slate-600 mb-1">Your Bid Price per Unit (BDT)</label>
+            <div class="relative">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <span class="text-slate-500 font-bold">৳</span>
+                </div>
+                <input type="number" step="0.01" id="bid-price-input" min="1"
+                    class="pl-7 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
+                    placeholder="e.g. 450.00">
+            </div>
+        </div>
+        <div class="flex justify-between items-center bg-slate-50 p-2 rounded border border-slate-100">
+            <span class="text-sm font-bold text-slate-700">Total Estimate</span>
+            <span id="bid-total-display" class="font-extrabold text-slate-900">৳ 0.00</span>
+        </div>
+        <button type="button" id="submit-bid-btn"
+            class="w-full flex items-center justify-center gap-2 bg-brand-primary text-white font-bold py-3 rounded-lg shadow-sm hover:bg-brand-dark transition">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+            </svg>
+            Submit Bid
+        </button>
+        <div id="bid-success" class="hidden bg-green-50 border border-green-200 rounded-lg p-3 text-center">
+            <p class="text-sm font-bold text-green-700">✓ Bid submitted successfully!</p>
+        </div>
+        <div id="bid-error" class="hidden bg-red-50 border border-red-200 rounded-lg p-3">
+            <p class="text-sm font-bold text-red-700" id="bid-error-msg">Error submitting bid.</p>
+        </div>
+    </div>
+</div>
+
+<script>
+// Bid widget functionality
+document.addEventListener('DOMContentLoaded', () => {
+    const rfqIdInput = document.getElementById('bid-rfq-id');
+    const rfqTitleEl = document.getElementById('selected-rfq-title');
+    const priceInput = document.getElementById('bid-price-input');
+    const totalDisplay = document.getElementById('bid-total-display');
+    let selectedQty = 1;
+
+    // Handle "Place Bid" button clicks
+    document.querySelectorAll('.quick-bid-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            rfqIdInput.value = btn.dataset.rfqId;
+            rfqTitleEl.textContent = btn.dataset.rfqTitle;
+            selectedQty = parseInt(btn.dataset.rfqQty) || 1;
+            document.getElementById('bid-success').classList.add('hidden');
+            document.getElementById('bid-error').classList.add('hidden');
+            priceInput.focus();
+        });
+    });
+
+    // Update total when price changes
+    priceInput.addEventListener('input', () => {
+        const price = parseFloat(priceInput.value) || 0;
+        totalDisplay.textContent = '৳ ' + (price * selectedQty).toLocaleString('en-US', {minimumFractionDigits: 2});
+    });
+
+    // Submit bid
+    document.getElementById('submit-bid-btn').addEventListener('click', async () => {
+        const rfqId = rfqIdInput.value.trim();
+        const price = parseFloat(priceInput.value);
+        document.getElementById('bid-success').classList.add('hidden');
+        document.getElementById('bid-error').classList.add('hidden');
+        
+        if (!rfqId) {
+            document.getElementById('bid-error-msg').textContent = 'Click "+ Place Bid" on an RFQ card first.';
+            document.getElementById('bid-error').classList.remove('hidden');
+            return;
+        }
+        if (!price || price <= 0) {
+            document.getElementById('bid-error-msg').textContent = 'Enter a valid bid price.';
+            document.getElementById('bid-error').classList.remove('hidden');
+            return;
+        }
+        
+        const btn = document.getElementById('submit-bid-btn');
+        btn.disabled = true;
+        btn.textContent = 'Submitting…';
+        
+        try {
+            const res = await fetch('/api/bid/submit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ rfq_id: rfqId, bid_price: price })
+            });
+            const data = await res.json();
+            
+            if (data.success) {
+                document.getElementById('bid-success').classList.remove('hidden');
+                priceInput.value = '';
+                totalDisplay.textContent = '৳ 0.00';
+            } else {
+                document.getElementById('bid-error-msg').textContent = data.detail || 'Failed to submit bid.';
+                document.getElementById('bid-error').classList.remove('hidden');
+            }
+        } catch(e) {
+            document.getElementById('bid-error-msg').textContent = 'Network error. Please try again.';
+            document.getElementById('bid-error').classList.remove('hidden');
+        }
+        
+        btn.disabled = false;
+        btn.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> Submit Bid';
+    });
+
+    // Widget minimize/maximize toggle
+    const widget = document.getElementById('quoting-widget');
+    const header = document.getElementById('quoting-widget-header');
+    const toggleBtn = document.getElementById('quoting-widget-toggle');
+    const formBody = document.getElementById('quoting-widget-form');
+    
+    toggleBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        formBody.classList.toggle('hidden');
+    });
+
+    // Widget dragging functionality
+    let isDragging = false, initialX, initialY, xOffset = 0, yOffset = 0;
+    
+    header.addEventListener('mousedown', (e) => {
+        if (e.target === toggleBtn || toggleBtn.contains(e.target)) return;
+        initialX = e.clientX - xOffset;
+        initialY = e.clientY - yOffset;
+        isDragging = true;
+        document.addEventListener('mousemove', onDrag);
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+            document.removeEventListener('mousemove', onDrag);
+        });
+    });
+    
+    function onDrag(e) {
+        if (!isDragging) return;
+        e.preventDefault();
+        xOffset = e.clientX - initialX;
+        yOffset = e.clientY - initialY;
+        widget.style.transform = `translate3d(${xOffset}px, ${yOffset}px, 0)`;
+    }
+});
+</script>
+
+{% include "shipping_calculator_modal.html" %}
+
 {% endblock %}

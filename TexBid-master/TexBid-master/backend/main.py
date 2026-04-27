@@ -9,7 +9,7 @@ import hashlib
 import secrets
 
 from database import connect_to_mongo, close_mongo_connection, db
-from models import RoleEnum, OverallStatusEnum, CompanyModel, LegalAndCapacityModel, CertificationModel, CertTypeEnum, VerificationStatusEnum, RFQModel, RFQStatusEnum, BidModel, SubscriptionTierEnum, UserModel, NotificationModel, NotificationTypeEnum
+from models import RoleEnum, OverallStatusEnum, CompanyModel, LegalAndCapacityModel, CertificationModel, CertTypeEnum, VerificationStatusEnum, RFQModel, RFQStatusEnum, BidModel, SubscriptionTierEnum, UserModel, NotificationModel, NotificationTypeEnum, ContractModel, ContractStatusEnum, EscrowStatusEnum, IncotermEnum, PaymentModel, ShippingCalculateRequest, ShippingMethodEnum, ShippingRateModel
 from auth import (
     create_access_token, create_refresh_token, refresh_access_token,
     get_current_user_jwt, require_login_jwt, require_buyer, require_supplier, require_admin_jwt,
@@ -19,10 +19,222 @@ import math
 from colorthief import ColorThief
 from datetime import datetime, timedelta
 
+
+# ----------------------------------------
+# PORT SEEDING
+# ----------------------------------------
+
+SEED_PORTS = [
+    {"code": "BDCGP", "name": "Chittagong", "country": "Bangladesh", "region": "Asia", "distance_factor": 1.0},
+    {"code": "BDMGL", "name": "Mongla", "country": "Bangladesh", "region": "Asia", "distance_factor": 1.0},
+    {"code": "CNSHA", "name": "Shanghai", "country": "China", "region": "Asia", "distance_factor": 1.1},
+    {"code": "CNTAO", "name": "Qingdao", "country": "China", "region": "Asia", "distance_factor": 1.1},
+    {"code": "CNNGB", "name": "Ningbo", "country": "China", "region": "Asia", "distance_factor": 1.1},
+    {"code": "CNSZX", "name": "Shenzhen", "country": "China", "region": "Asia", "distance_factor": 1.1},
+    {"code": "INBOM", "name": "Mumbai", "country": "India", "region": "Asia", "distance_factor": 1.2},
+    {"code": "INNSA", "name": "Nhava Sheva", "country": "India", "region": "Asia", "distance_factor": 1.2},
+    {"code": "PKKAR", "name": "Karachi", "country": "Pakistan", "region": "Asia", "distance_factor": 1.2},
+    {"code": "LKCMB", "name": "Colombo", "country": "Sri Lanka", "region": "Asia", "distance_factor": 1.15},
+    {"code": "VNSGN", "name": "Ho Chi Minh City", "country": "Vietnam", "region": "Asia", "distance_factor": 1.05},
+    {"code": "IDJKT", "name": "Jakarta", "country": "Indonesia", "region": "Asia", "distance_factor": 1.1},
+    {"code": "MYPKG", "name": "Port Klang", "country": "Malaysia", "region": "Asia", "distance_factor": 1.1},
+    {"code": "SGSIN", "name": "Singapore", "country": "Singapore", "region": "Asia", "distance_factor": 1.0},
+    {"code": "TRIST", "name": "Istanbul", "country": "Turkey", "region": "Europe", "distance_factor": 2.0},
+    {"code": "NLRTM", "name": "Rotterdam", "country": "Netherlands", "region": "Europe", "distance_factor": 2.5},
+    {"code": "DEHAM", "name": "Hamburg", "country": "Germany", "region": "Europe", "distance_factor": 2.5},
+    {"code": "GBFXT", "name": "Felixstowe", "country": "United Kingdom", "region": "Europe", "distance_factor": 2.6},
+    {"code": "FRMRS", "name": "Marseille", "country": "France", "region": "Europe", "distance_factor": 2.4},
+    {"code": "ITGOA", "name": "Genoa", "country": "Italy", "region": "Europe", "distance_factor": 2.4},
+    {"code": "USNYC", "name": "New York", "country": "United States", "region": "Americas", "distance_factor": 3.5},
+    {"code": "USLAX", "name": "Los Angeles", "country": "United States", "region": "Americas", "distance_factor": 3.2},
+    {"code": "CAYVR", "name": "Vancouver", "country": "Canada", "region": "Americas", "distance_factor": 3.3},
+    {"code": "BRSSZ", "name": "Santos", "country": "Brazil", "region": "Americas", "distance_factor": 3.8},
+    {"code": "AUPOL", "name": "Port of Melbourne", "country": "Australia", "region": "Oceania", "distance_factor": 2.8},
+    {"code": "ZASPE", "name": "Cape Town", "country": "South Africa", "region": "Africa", "distance_factor": 3.0},
+    {"code": "EGPSD", "name": "Port Said", "country": "Egypt", "region": "Africa", "distance_factor": 2.2},
+]
+
+DEFAULT_RATES = [
+    {"origin_region": "Asia", "dest_region": "Asia", "method": "SEA", "base_rate_per_kg": 0.80},
+    {"origin_region": "Asia", "dest_region": "Asia", "method": "AIR", "base_rate_per_kg": 4.50},
+    {"origin_region": "Asia", "dest_region": "Asia", "method": "ROAD", "base_rate_per_kg": 1.20},
+    {"origin_region": "Asia", "dest_region": "Europe", "method": "SEA", "base_rate_per_kg": 1.80},
+    {"origin_region": "Asia", "dest_region": "Europe", "method": "AIR", "base_rate_per_kg": 7.50},
+    {"origin_region": "Asia", "dest_region": "Americas", "method": "SEA", "base_rate_per_kg": 2.20},
+    {"origin_region": "Asia", "dest_region": "Americas", "method": "AIR", "base_rate_per_kg": 9.00},
+    {"origin_region": "Asia", "dest_region": "Oceania", "method": "SEA", "base_rate_per_kg": 1.60},
+    {"origin_region": "Asia", "dest_region": "Africa", "method": "SEA", "base_rate_per_kg": 2.00},
+    {"origin_region": "Europe", "dest_region": "Europe", "method": "SEA", "base_rate_per_kg": 0.60},
+    {"origin_region": "Europe", "dest_region": "Europe", "method": "ROAD", "base_rate_per_kg": 0.90},
+    {"origin_region": "Europe", "dest_region": "Americas", "method": "SEA", "base_rate_per_kg": 1.50},
+    {"origin_region": "Americas", "dest_region": "Americas", "method": "SEA", "base_rate_per_kg": 0.70},
+    {"origin_region": "Americas", "dest_region": "Europe", "method": "SEA", "base_rate_per_kg": 1.50},
+]
+
+INCOTERMS_DATA = {
+    "EXW": {
+        "name": "Ex Works",
+        "description": "The seller makes goods available at their premises. The buyer bears all costs and risks from that point.",
+        "seller_pays": [],
+        "buyer_pays": ["loading", "export_clearance", "main_carriage", "insurance", "import_duties", "last_mile"],
+        "seller_cost_multiplier": 0.0,
+        "includes_insurance": False,
+        "includes_duties": False,
+    },
+    "FOB": {
+        "name": "Free On Board",
+        "description": "Seller delivers goods on board the vessel at the named port of shipment. Risk transfers when goods are on board.",
+        "seller_pays": ["export_clearance", "loading", "port_charges"],
+        "buyer_pays": ["main_carriage", "insurance", "import_duties", "last_mile"],
+        "seller_cost_multiplier": 0.15,
+        "includes_insurance": False,
+        "includes_duties": False,
+    },
+    "CFR": {
+        "name": "Cost and Freight",
+        "description": "Seller pays freight to destination port. Risk transfers when goods are on board at origin.",
+        "seller_pays": ["export_clearance", "loading", "port_charges", "main_carriage"],
+        "buyer_pays": ["insurance", "import_duties", "last_mile"],
+        "seller_cost_multiplier": 1.0,
+        "includes_insurance": False,
+        "includes_duties": False,
+    },
+    "CIF": {
+        "name": "Cost, Insurance and Freight",
+        "description": "Seller pays freight and insurance to destination port. Risk transfers when goods are on board at origin.",
+        "seller_pays": ["export_clearance", "loading", "port_charges", "main_carriage", "insurance"],
+        "buyer_pays": ["import_duties", "last_mile"],
+        "seller_cost_multiplier": 1.0,
+        "includes_insurance": True,
+        "includes_duties": False,
+    },
+    "DAP": {
+        "name": "Delivered at Place",
+        "description": "Seller delivers goods to named destination, ready for unloading. Buyer pays import duties.",
+        "seller_pays": ["export_clearance", "loading", "main_carriage", "insurance", "destination_charges"],
+        "buyer_pays": ["import_duties", "unloading"],
+        "seller_cost_multiplier": 1.0,
+        "includes_insurance": True,
+        "includes_duties": False,
+    },
+    "DDP": {
+        "name": "Delivered Duty Paid",
+        "description": "Seller bears all costs including import duties and taxes to the named destination. Maximum seller responsibility.",
+        "seller_pays": ["export_clearance", "loading", "main_carriage", "insurance", "import_duties", "last_mile"],
+        "buyer_pays": [],
+        "seller_cost_multiplier": 1.0,
+        "includes_insurance": True,
+        "includes_duties": True,
+    },
+}
+
+TRANSIT_DAYS = {
+    ("Asia", "Asia", "SEA"): 14,
+    ("Asia", "Asia", "AIR"): 3,
+    ("Asia", "Asia", "ROAD"): 10,
+    ("Asia", "Europe", "SEA"): 28,
+    ("Asia", "Europe", "AIR"): 5,
+    ("Asia", "Americas", "SEA"): 35,
+    ("Asia", "Americas", "AIR"): 6,
+    ("Asia", "Oceania", "SEA"): 21,
+    ("Asia", "Africa", "SEA"): 25,
+    ("Europe", "Europe", "SEA"): 7,
+    ("Europe", "Europe", "ROAD"): 5,
+    ("Europe", "Americas", "SEA"): 14,
+    ("Americas", "Americas", "SEA"): 10,
+    ("Americas", "Europe", "SEA"): 14,
+}
+
+
+async def seed_ports():
+    """Seed the ports collection with major textile trade ports if empty."""
+    from database import db
+    if db is None:
+        print("⚠️  Port seeding skipped: database not available")
+        return
+
+    count = await db["ports"].count_documents({})
+    if count >= len(SEED_PORTS):
+        print(f"✅ Ports already seeded ({count} ports)")
+    else:
+        await db["ports"].delete_many({})
+        await db["ports"].insert_many(SEED_PORTS)
+        print(f"✅ Seeded {len(SEED_PORTS)} ports")
+
+    # Seed default rates if empty
+    rate_count = await db["shipping_rates"].count_documents({})
+    if rate_count == 0:
+        import uuid as _uuid
+        from datetime import datetime as _dt
+        rates_to_insert = []
+        for r in DEFAULT_RATES:
+            rates_to_insert.append({
+                "id": str(_uuid.uuid4()),
+                "origin_region": r["origin_region"],
+                "dest_region": r["dest_region"],
+                "method": r["method"],
+                "base_rate_per_kg": r["base_rate_per_kg"],
+                "updated_at": _dt.utcnow(),
+            })
+        await db["shipping_rates"].insert_many(rates_to_insert)
+        print(f"✅ Seeded {len(rates_to_insert)} default shipping rates")
+
+    # Seed global shipping config if not present
+    existing_config = await db["shipping_config"].find_one({"_id": "global"})
+    if not existing_config:
+        await db["shipping_config"].insert_one({
+            "_id": "global",
+            # Insurance
+            "insurance_rate": 0.003,          # 0.3% of freight cost
+            # Port / handling fees (flat USD per shipment)
+            "port_fee_sea": 320.0,
+            "port_fee_air": 180.0,
+            "port_fee_road": 90.0,
+            # Routing factors (multiplied onto base distance)
+            "routing_factor_sea": 1.2,
+            "routing_factor_air": 1.05,
+            "routing_factor_road": 1.3,
+            # Speed (km/h) for transit time estimation
+            "speed_sea_kmh": 37.0,
+            "speed_air_kmh": 800.0,
+            "speed_road_kmh": 60.0,
+            # Port handling days added to transit time
+            "handling_days_sea": 4.0,
+            "handling_days_air": 1.5,
+            "handling_days_road": 2.0,
+            # Min / max freight charge (USD) per shipment
+            "min_freight_sea": 150.0,
+            "max_freight_sea": 50000.0,
+            "min_freight_air": 80.0,
+            "max_freight_air": 30000.0,
+            "min_freight_road": 50.0,
+            "max_freight_road": 20000.0,
+            # Air freight distance zone thresholds (km) and rate multipliers
+            "air_zone_short_max_km": 3000.0,   # short-haul ≤ 3000 km
+            "air_zone_mid_max_km": 8000.0,     # mid-haul ≤ 8000 km
+            "air_zone_short_multiplier": 1.0,
+            "air_zone_mid_multiplier": 1.2,
+            "air_zone_long_multiplier": 1.5,
+            # Import duty estimate rate (used for DDP)
+            "import_duty_rate": 0.12,
+            "updated_at": datetime.utcnow().isoformat(),
+        })
+        print("✅ Seeded default shipping_config")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup logic
     await connect_to_mongo()
+    await seed_ports()
+    # Create TTL index on sessions collection so expired sessions auto-delete
+    from database import db as _db
+    if _db is not None:
+        try:
+            await _db["sessions"].create_index("expires_at", expireAfterSeconds=0)
+            print("✅ Sessions TTL index ensured")
+        except Exception:
+            pass
     yield
     # Shutdown logic
     await close_mongo_connection()
@@ -46,8 +258,8 @@ templates = Jinja2Templates(directory="../frontend/src/pages")
 # AUTHENTICATION HELPERS
 # ----------------------------------------
 
-# In-memory session store (in production, use Redis or database)
-sessions = {}
+# MongoDB-backed session store — survives server restarts
+# Sessions are stored in the 'sessions' collection with a 30-day TTL index
 
 def hash_password(password: str) -> str:
     """Hash password using SHA-256."""
@@ -57,37 +269,59 @@ def verify_password(password: str, password_hash: str) -> bool:
     """Verify password against hash."""
     return hash_password(password) == password_hash
 
-def create_session(user_id: str) -> str:
-    """Create a new session token."""
+async def create_session(user_id: str) -> str:
+    """Create a new session token and persist it to MongoDB."""
+    from database import db
     session_token = secrets.token_urlsafe(32)
-    sessions[session_token] = user_id
+    if db is not None:
+        await db["sessions"].update_one(
+            {"token": session_token},
+            {"$set": {
+                "token": session_token,
+                "user_id": user_id,
+                "created_at": datetime.utcnow(),
+                "expires_at": datetime.utcnow() + timedelta(days=30),
+            }},
+            upsert=True
+        )
     return session_token
 
-def get_user_from_session(session_token: Optional[str]) -> Optional[str]:
-    """Get user ID from session token."""
+async def get_user_from_session(session_token: Optional[str]) -> Optional[str]:
+    """Get user ID from session token stored in MongoDB."""
     if not session_token:
         return None
-    return sessions.get(session_token)
+    from database import db
+    if db is None:
+        return None
+    session = await db["sessions"].find_one({"token": session_token})
+    if not session:
+        return None
+    # Check expiry
+    expires_at = session.get("expires_at")
+    if expires_at and datetime.utcnow() > expires_at:
+        await db["sessions"].delete_one({"token": session_token})
+        return None
+    return session.get("user_id")
 
 async def get_current_user(session: Optional[str] = Cookie(None)):
     """Dependency to get current logged-in user."""
     if not session:
         return None
-    
-    user_id = get_user_from_session(session)
+
+    user_id = await get_user_from_session(session)
     if not user_id:
         return None
-    
+
     from database import db
     if db is None:
         return None
-    
+
     user = await db["users"].find_one({"id": user_id})
-    
+
     # Check and auto-downgrade expired PREMIUM subscriptions
     if user:
         await check_subscription_expiration(user)
-    
+
     return user
 
 async def check_subscription_expiration(user: dict):
@@ -332,10 +566,10 @@ async def login_user(
         {"id": user["id"]},
         {"$set": {"last_login": datetime.utcnow()}}
     )
-    
-    # Create session
-    session_token = create_session(user["id"])
-    
+
+    # Create session (persisted to MongoDB)
+    session_token = await create_session(user["id"])
+
     # Redirect to home with session cookie
     response = RedirectResponse(url="/", status_code=303)
     response.set_cookie(
@@ -344,15 +578,16 @@ async def login_user(
         httponly=True,
         max_age=86400 * 30  # 30 days
     )
-    
+
     return response
 
 @app.get("/logout")
 async def logout(session: Optional[str] = Cookie(None)):
-    """Log out user."""
-    if session and session in sessions:
-        del sessions[session]
-    
+    """Log out user — delete session from MongoDB."""
+    from database import db
+    if session and db is not None:
+        await db["sessions"].delete_one({"token": session})
+
     response = RedirectResponse(url="/", status_code=303)
     response.delete_cookie("session")
     return response
@@ -514,7 +749,7 @@ async def api_logout(request: Request, session: Optional[str] = Cookie(None)):
 # ADMIN ROUTES
 # ----------------------------------------
 
-def require_admin(user: dict = Depends(require_login)):
+async def require_admin(user: dict = Depends(require_login)):
     """Dependency to require admin access."""
     if not user.get("is_admin", False):
         raise HTTPException(status_code=403, detail="Admin access required")
@@ -554,8 +789,8 @@ async def admin_login(
         {"$set": {"last_login": datetime.utcnow()}}
     )
     
-    # Create session
-    session_token = create_session(user["id"])
+    # Create session (persisted to MongoDB)
+    session_token = await create_session(user["id"])
     
     # Return success with session cookie
     response = JSONResponse({"success": True, "message": "Login successful"})
@@ -792,9 +1027,9 @@ async def delete_account(request: Request, user: dict = Depends(require_login), 
         # Delete user
         await db["users"].delete_one({"id": user_id})
         
-        # Clear session
-        if session and session in sessions:
-            del sessions[session]
+        # Clear session from MongoDB
+        if session:
+            await db["sessions"].delete_one({"token": session})
         
         print(f"Account deleted: User={user.get('email')}, Company={company.get('name') if company else 'Unknown'}")
         
@@ -2245,22 +2480,186 @@ async def delete_rfq(rfq_id: str, user: dict = Depends(require_login)):
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
 
+@app.get("/dashboard", response_class=HTMLResponse)
+async def smart_dashboard(request: Request, user: Optional[dict] = Depends(get_current_user)):
+    """Redirect to the correct dashboard based on the user's role."""
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    from database import db
+    if db is not None:
+        company = await db["companies"].find_one({"id": user.get("company_id")})
+        if company:
+            role = company.get("role", "").upper()
+            if role == "SUPPLIER":
+                return RedirectResponse(url="/dashboard/supplier", status_code=303)
+            elif role == "BUYER":
+                return RedirectResponse(url="/dashboard/buyer", status_code=303)
+
+    return RedirectResponse(url="/dashboard/buyer", status_code=303)
+
+
+@app.get("/rfq/browse", response_class=HTMLResponse)
+async def rfq_browse_redirect(request: Request, user: Optional[dict] = Depends(get_current_user)):
+    """Smart Browse RFQs redirect — buyers see their dashboard, suppliers see the RFQ feed."""
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    from database import db
+    if db is not None:
+        company = await db["companies"].find_one({"id": user.get("company_id")})
+        if company:
+            role = company.get("role", "").upper()
+            if role == "SUPPLIER":
+                return RedirectResponse(url="/dashboard/supplier", status_code=303)
+            elif role == "BUYER":
+                return RedirectResponse(url="/dashboard/buyer", status_code=303)
+
+    return RedirectResponse(url="/dashboard/buyer", status_code=303)
+
+
+@app.get("/dashboard/buyer", response_class=HTMLResponse)
+async def buyer_dashboard(request: Request, user: dict = Depends(require_login)):
+    """Buyer dashboard — shows their RFQs, bids received, and payment statuses."""
+    from database import db
+    rfqs = []
+    payments = []
+    if db is not None:
+        company = await db["companies"].find_one({"id": user.get("company_id")})
+        buyer_id = user.get("id")
+        company_id = user.get("company_id")
+
+        # Fetch buyer's RFQs (match by multiple buyer_id formats)
+        async for rfq in db["rfqs"].find({
+            "$or": [
+                {"buyer_id": buyer_id},
+                {"buyer_id": company_id},
+                {"buyer_id": company.get("id") if company else None},
+                {"buyer_id": company.get("unique_id") if company else None},
+            ]
+        }).sort("created_at", -1):
+            rfq["_id"] = str(rfq["_id"])
+            # Count bids for this RFQ
+            rfq["bid_count"] = await db["bids"].count_documents({"rfq_id": rfq["id"]})
+            # Check if paid
+            payment = await db["payments"].find_one({
+                "order_id": rfq["id"],
+                "status": {"$in": ["PAID_IN_ESCROW", "RELEASED"]}
+            })
+            rfq["payment_status"] = payment.get("status") if payment else None
+            rfq["payment_id"] = payment.get("payment_id") if payment else None
+            rfqs.append(rfq)
+
+        # Fetch buyer's payments
+        async for p in db["payments"].find({"buyer_id": buyer_id}).sort("created_at", -1).limit(5):
+            p["_id"] = str(p["_id"])
+            payments.append(p)
+
+    return templates.TemplateResponse("buyer_dashboard.html", {
+        "request": request,
+        "user": user,
+        "rfqs": rfqs,
+        "payments": payments,
+    })
+
+
 @app.get("/dashboard/supplier", response_class=HTMLResponse)
 async def supplier_dashboard_feed(request: Request, user: Optional[dict] = Depends(get_current_user)):
     from database import db
-    
+
+    rfqs = []
+    orders = []  # accepted bids + paid orders
+
+    if db is not None:
+        # Open RFQs for browsing
+        async for document in db["rfqs"].find({"status": "OPEN"}).sort("created_at", -1):
+            document['_id'] = str(document['_id'])
+            rfqs.append(document)
+
+        if user:
+            company = await db["companies"].find_one({"id": user.get("company_id")})
+            company_role = company.get("role", "").upper() if company else ""
+
+            # Only show orders/bids section for SUPPLIER accounts
+            if company_role == "SUPPLIER":
+                supplier_id = company.get("unique_id") or company.get("id") if company else user.get("id")
+
+                # Fetch all bids by this supplier (accepted, confirmed, or with payments)
+                async for bid in db["bids"].find({
+                    "supplier_id": supplier_id,
+                    "status": {"$in": ["ACCEPTED", "CONFIRMED", "ACTIVE"]}
+                }):
+                    rfq = await db["rfqs"].find_one({"id": bid.get("rfq_id")})
+                    if not rfq:
+                        continue
+
+                    # Check for payment linked to this specific bid
+                    payment = await db["payments"].find_one({
+                        "order_id": bid.get("rfq_id"),
+                        "bid_id": bid.get("id"),
+                        "status": {"$in": [
+                            "PAID_IN_ESCROW", "WORK_IN_PROGRESS",
+                            "SENT_FOR_DELIVERY", "RELEASED"
+                        ]}
+                    })
+
+                    if bid.get("status") in ("ACCEPTED", "CONFIRMED") or payment:
+                        if payment:
+                            payment["_id"] = str(payment["_id"])
+                        orders.append({
+                            "bid": bid,
+                            "payment": payment,
+                            "rfq": rfq,
+                        })
+                
+                # Also fetch bids that have payments but might not be in ACCEPTED/CONFIRMED status anymore
+                async for payment in db["payments"].find({
+                    "supplier_id": supplier_id,
+                    "status": {"$in": [
+                        "PAID_IN_ESCROW", "WORK_IN_PROGRESS",
+                        "SENT_FOR_DELIVERY", "RELEASED"
+                    ]}
+                }):
+                    # Check if we already have this order
+                    bid_id = payment.get("bid_id")
+                    if bid_id and not any(o["bid"].get("id") == bid_id for o in orders):
+                        bid = await db["bids"].find_one({"id": bid_id})
+                        if bid:
+                            rfq = await db["rfqs"].find_one({"id": bid.get("rfq_id")})
+                            if rfq:
+                                payment["_id"] = str(payment["_id"])
+                                orders.append({
+                                    "bid": bid,
+                                    "payment": payment,
+                                    "rfq": rfq,
+                                })
+
+    return templates.TemplateResponse("supplier_dashboard.html", {
+        "request": request,
+        "rfqs": rfqs,
+        "orders": orders,
+        "user": user,
+    })
+
+
+@app.get("/rfq/feed", response_class=HTMLResponse)
+async def rfq_feed_page(request: Request, user: Optional[dict] = Depends(get_current_user)):
+    """Browse all open RFQs - accessible to both buyers and suppliers."""
+    from database import db
+
     rfqs = []
     if db is not None:
-        # Sort by newest created
-        cursor = db["rfqs"].find({"status": "OPEN"}).sort("created_at", -1)
-        # Natively render the documents to dicts directly for the template
-        async for document in cursor:
-            # Reformat UUID and datetime objects to strings if necessary natively, 
-            # though Jinja can handle standard python datetimes natively.
-            document['_id'] = str(document['_id']) 
+        # Fetch all open RFQs
+        async for document in db["rfqs"].find({"status": "OPEN"}).sort("created_at", -1):
+            document['_id'] = str(document['_id'])
             rfqs.append(document)
-        
-    return templates.TemplateResponse("supplier_dashboard.html", {"request": request, "rfqs": rfqs, "user": user})
+
+    return templates.TemplateResponse("rfq_feed.html", {
+        "request": request,
+        "rfqs": rfqs,
+        "user": user,
+    })
+
 
 @app.post("/quote/submit")
 async def submit_quote(request: Request):
@@ -3116,35 +3515,97 @@ async def rfq_detail_page(request: Request, rfq_id: str, user: Optional[dict] = 
         # Check if current user is the owner
         is_owner = False
         if user:
-            # Check if user's company_id matches the buyer_id of the RFQ
-            # Or check if the RFQ was created by this user
             user_company = await db["companies"].find_one({"id": user.get("company_id")})
-            
-            # Debug: Print ownership check details
-            print(f"🔍 Ownership Check:")
-            print(f"   RFQ buyer_id: {rfq.get('buyer_id')}")
-            print(f"   User ID: {user.get('id')}")
-            print(f"   User company_id: {user.get('company_id')}")
-            if user_company:
-                print(f"   Company ID: {user_company.get('id')}")
-                print(f"   Company unique_id: {user_company.get('unique_id')}")
-            
-            # Match by multiple criteria
+
             is_owner = (
-                rfq.get("buyer_id") == user.get("id") or  # Direct user ID match
-                rfq.get("buyer_id") == user.get("company_id") or  # Company ID match
-                (user_company and rfq.get("buyer_id") == user_company.get("id")) or  # Company doc ID match
-                (user_company and rfq.get("buyer_id") == user_company.get("unique_id")) or  # Company unique_id match
-                rfq.get("buyer_id") == "SIMULATED_BUYER_123"  # Legacy: treat all simulated RFQs as owned by logged-in users
+                rfq.get("buyer_id") == user.get("id") or
+                rfq.get("buyer_id") == user.get("company_id") or
+                (user_company and rfq.get("buyer_id") == user_company.get("id")) or
+                (user_company and rfq.get("buyer_id") == user_company.get("unique_id")) or
+                rfq.get("buyer_id") == "SIMULATED_BUYER_123"
             )
-            
-            print(f"   ✅ Is Owner: {is_owner}")
+
+            # Also treat as owner if user accepted a bid on this RFQ
+            # (handles case where buyer_id format doesn't match)
+            if not is_owner:
+                accepted_bid = await db["bids"].find_one({
+                    "rfq_id": rfq_id,
+                    "status": {"$in": ["ACCEPTED", "CONFIRMED"]}
+                })
+                if accepted_bid:
+                    # Check if current user is NOT the bidder (i.e. they are the acceptor/buyer)
+                    bidder_ids = {accepted_bid.get("supplier_id")}
+                    if user_company:
+                        bidder_ids.add(user_company.get("unique_id"))
+                        bidder_ids.add(user_company.get("id"))
+                    bidder_ids.discard(None)
+                    # If user is not the bidder, they must be the one who accepted = buyer
+                    user_all_ids = {user.get("id"), user.get("company_id")}
+                    if user_company:
+                        user_all_ids.add(user_company.get("id"))
+                        user_all_ids.add(user_company.get("unique_id"))
+                    user_all_ids.discard(None)
+                    if not (user_all_ids & bidder_ids):
+                        is_owner = True  # user is the acceptor = buyer
         
+        # Fetch all bids for this RFQ
+        # Determine current user's company role and IDs for bid ownership checks
+        user_company_role = user_company.get("role", "").upper() if user_company else ""
+        user_company_ids = set()
+        if user:
+            user_company_ids.add(user.get("id"))
+            user_company_ids.add(user.get("company_id"))
+            if user_company:
+                user_company_ids.add(user_company.get("id"))
+                user_company_ids.add(user_company.get("unique_id"))
+        user_company_ids.discard(None)
+
+        bids = []
+        async for bid in db["bids"].find({"rfq_id": rfq_id}).sort("bid_price", 1):
+            bid["_id"] = str(bid["_id"])
+            
+            # First, clean up any old PENDING payments for this bid (older than 30 minutes)
+            from datetime import timedelta
+            thirty_minutes_ago = datetime.utcnow() - timedelta(minutes=30)
+            await db["payments"].delete_many({
+                "order_id": rfq_id,
+                "bid_id": bid.get("id"),
+                "status": EscrowStatusEnum.PENDING,
+                "created_at": {"$lt": thirty_minutes_ago}
+            })
+            
+            # Check if THIS specific bid has been paid (only PAID_IN_ESCROW or RELEASED)
+            existing_payment = await db["payments"].find_one({
+                "order_id": rfq_id,
+                "bid_id": bid.get("id"),
+                "status": {"$in": ["PAID_IN_ESCROW", "RELEASED"]}
+            })
+            bid["already_paid"] = existing_payment is not None
+            
+            # Check if contract exists for this bid
+            contract = await db["contracts"].find_one({
+                "rfq_id": rfq_id,
+                "bid_id": bid.get("id")
+            })
+            if contract:
+                bid["contract_id"] = contract.get("contract_id")
+                bid["contract_status"] = contract.get("status")
+            else:
+                bid["contract_id"] = None
+                bid["contract_status"] = None
+            
+            # Flag if this bid was placed by the current user (so they can't accept their own)
+            bid["is_own_bid"] = bid.get("supplier_id") in user_company_ids
+            bids.append(bid)
+
         return templates.TemplateResponse("rfq_detail.html", {
             "request": request,
             "user": user,
             "rfq": rfq,
-            "is_owner": is_owner
+            "is_owner": is_owner,
+            "bids": bids,
+            "user_company_role": user_company_role,
+            "is_buyer_role": user_company_role == "BUYER",
         })
     
     except HTTPException:
@@ -3270,1498 +3731,4 @@ async def update_rfq(rfq_id: str, request: Request, user: dict = Depends(require
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
 
-# ============================================================
-# TWO-WAY RATING SYSTEM
-# ============================================================
-
-@app.post("/ratings/add")
-async def add_rating(request: Request, user: dict = Depends(require_login)):
-    """
-    Submit a rating for a counterpart after an order (RFQ) is completed.
-    - Buyers can rate suppliers, suppliers can rate buyers.
-    - Requires a completed (AWARDED/CLOSED) RFQ linking both parties.
-    - One rating per order per reviewer.
-    """
-    from fastapi.responses import JSONResponse
-    from database import db
-    from models import RatingModel
-
-    if db is None:
-        return JSONResponse({"success": False, "error": "Database not available"}, status_code=500)
-
-    try:
-        body = await request.json()
-        order_id = (body.get("order_id") or "").strip()
-        rating_value = body.get("rating")
-        review_text = (body.get("review_text") or "").strip()
-
-        # --- Basic validation ---
-        errors = {}
-        if not order_id:
-            errors["order_id"] = "Order ID is required"
-        if rating_value is None:
-            errors["rating"] = "Rating is required"
-        else:
-            try:
-                rating_value = int(rating_value)
-                if not (1 <= rating_value <= 5):
-                    errors["rating"] = "Rating must be between 1 and 5"
-            except (ValueError, TypeError):
-                errors["rating"] = "Rating must be a number between 1 and 5"
-
-        if errors:
-            return JSONResponse({"success": False, "errors": errors}, status_code=422)
-
-        # --- Fetch reviewer's company ---
-        reviewer_company = await db["companies"].find_one({"id": user.get("company_id")})
-        if not reviewer_company:
-            return JSONResponse({"success": False, "error": "Your company profile was not found"}, status_code=404)
-
-        reviewer_role = reviewer_company.get("role")  # BUYER or SUPPLIER
-
-        # --- Fetch the RFQ/order ---
-        rfq = await db["rfqs"].find_one({"id": order_id})
-        if not rfq:
-            return JSONResponse({"success": False, "error": "Order not found"}, status_code=404)
-
-        # --- Verify order is completed (AWARDED or CLOSED) ---
-        rfq_status = rfq.get("status", "")
-        if rfq_status not in ("AWARDED", "CLOSED"):
-            return JSONResponse({
-                "success": False,
-                "error": "You can only rate after an order is completed (status: AWARDED or CLOSED)"
-            }, status_code=403)
-
-        # --- Determine who is being rated ---
-        if reviewer_role == "BUYER":
-            # Buyer rates the winning supplier
-            # Find the winning bid (lowest bid or the awarded supplier)
-            winning_bid = await db["bids"].find_one(
-                {"rfq_id": order_id, "status": {"$ne": "CANCELLED"}},
-                sort=[("bid_price", 1)]
-            )
-            if not winning_bid:
-                return JSONResponse({
-                    "success": False,
-                    "error": "No supplier bid found for this order"
-                }, status_code=404)
-
-            # Find the supplier company by unique_id
-            reviewed_company = await db["companies"].find_one({"unique_id": winning_bid.get("supplier_id")})
-            if not reviewed_company:
-                return JSONResponse({"success": False, "error": "Supplier company not found"}, status_code=404)
-
-            # Verify the reviewer is actually the buyer of this RFQ
-            buyer_match = (
-                rfq.get("buyer_id") == user.get("id") or
-                rfq.get("buyer_id") == user.get("company_id") or
-                rfq.get("buyer_id") == reviewer_company.get("id") or
-                rfq.get("buyer_id") == reviewer_company.get("unique_id")
-            )
-            if not buyer_match:
-                return JSONResponse({
-                    "success": False,
-                    "error": "You are not the buyer for this order"
-                }, status_code=403)
-
-        elif reviewer_role == "SUPPLIER":
-            # Supplier rates the buyer of the RFQ
-            # Verify this supplier actually bid on this RFQ
-            supplier_bid = await db["bids"].find_one({
-                "rfq_id": order_id,
-                "supplier_id": reviewer_company.get("unique_id")
-            })
-            if not supplier_bid:
-                return JSONResponse({
-                    "success": False,
-                    "error": "You did not participate in this order"
-                }, status_code=403)
-
-            # Find the buyer's company
-            buyer_user = await db["users"].find_one({"id": rfq.get("buyer_id")})
-            if buyer_user:
-                reviewed_company = await db["companies"].find_one({"id": buyer_user.get("company_id")})
-            else:
-                # buyer_id might be company_id directly
-                reviewed_company = await db["companies"].find_one({
-                    "$or": [
-                        {"id": rfq.get("buyer_id")},
-                        {"unique_id": rfq.get("buyer_id")}
-                    ]
-                })
-
-            if not reviewed_company:
-                return JSONResponse({"success": False, "error": "Buyer company not found"}, status_code=404)
-        else:
-            return JSONResponse({"success": False, "error": "Invalid role for rating"}, status_code=403)
-
-        # --- Find the reviewed user ---
-        reviewed_user = await db["users"].find_one({"company_id": reviewed_company.get("id")})
-        reviewed_user_id = reviewed_user.get("id") if reviewed_user else reviewed_company.get("id")
-
-        # --- Prevent duplicate rating (one per order per reviewer) ---
-        existing = await db["ratings"].find_one({
-            "order_id": order_id,
-            "reviewer_id": user.get("id")
-        })
-        if existing:
-            return JSONResponse({
-                "success": False,
-                "error": "You have already submitted a rating for this order"
-            }, status_code=409)
-
-        # --- Create and save the rating ---
-        rating = RatingModel(
-            reviewer_id=user.get("id"),
-            reviewer_company_id=reviewer_company.get("id"),
-            reviewer_name=reviewer_company.get("name", "Unknown"),
-            reviewed_user_id=reviewed_user_id,
-            reviewed_company_id=reviewed_company.get("id"),
-            reviewed_company_name=reviewed_company.get("name", "Unknown"),
-            order_id=order_id,
-            rating=rating_value,
-            review_text=review_text if review_text else None,
-        )
-
-        await db["ratings"].insert_one(rating.model_dump())
-
-        # --- Recalculate and update the reviewed company's average rating ---
-        pipeline = [
-            {"$match": {"reviewed_company_id": reviewed_company.get("id")}},
-            {"$group": {
-                "_id": None,
-                "avg_rating": {"$avg": "$rating"},
-                "total_reviews": {"$sum": 1}
-            }}
-        ]
-        agg = await db["ratings"].aggregate(pipeline).to_list(1)
-        if agg:
-            avg = round(agg[0]["avg_rating"], 2)
-            total = agg[0]["total_reviews"]
-            await db["companies"].update_one(
-                {"id": reviewed_company.get("id")},
-                {"$set": {"avg_rating": avg, "total_reviews": total}}
-            )
-
-        print(f"Rating submitted: {reviewer_company.get('name')} → {reviewed_company.get('name')} | {rating_value}⭐ | Order: {order_id}")
-
-        return JSONResponse({
-            "success": True,
-            "message": "Rating submitted successfully",
-            "rating_id": rating.id
-        })
-
-    except Exception as e:
-        print(f"Error submitting rating: {e}")
-        import traceback
-        traceback.print_exc()
-        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
-
-
-@app.get("/ratings/{company_id}")
-async def get_ratings(company_id: str, request: Request):
-    """
-    Get all ratings for a company (by company ID).
-    Returns the list of reviews plus summary stats (avg rating, total count).
-    """
-    from fastapi.responses import JSONResponse
-    from database import db
-
-    if db is None:
-        return JSONResponse({"success": False, "error": "Database not available"}, status_code=500)
-
-    try:
-        # Verify company exists
-        company = await db["companies"].find_one({"id": company_id})
-        if not company:
-            return JSONResponse({"success": False, "error": "Company not found"}, status_code=404)
-
-        # Fetch all ratings for this company
-        cursor = db["ratings"].find(
-            {"reviewed_company_id": company_id},
-            sort=[("created_at", -1)]
-        )
-        ratings_list = await cursor.to_list(length=100)
-
-        # Sanitize MongoDB _id
-        for r in ratings_list:
-            r.pop("_id", None)
-
-        # Compute summary
-        total = len(ratings_list)
-        avg = round(sum(r["rating"] for r in ratings_list) / total, 2) if total > 0 else 0.0
-
-        # Star distribution
-        distribution = {str(i): 0 for i in range(1, 6)}
-        for r in ratings_list:
-            distribution[str(r["rating"])] = distribution.get(str(r["rating"]), 0) + 1
-
-        return JSONResponse({
-            "success": True,
-            "company_name": company.get("name"),
-            "avg_rating": avg,
-            "total_reviews": total,
-            "distribution": distribution,
-            "ratings": ratings_list
-        })
-
-    except Exception as e:
-        print(f"Error fetching ratings: {e}")
-        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
-
-
-@app.delete("/ratings/{rating_id}")
-async def delete_rating(rating_id: str, user: dict = Depends(require_login)):
-    """
-    Admin-only: Delete an inappropriate or fake review.
-    """
-    from fastapi.responses import JSONResponse
-    from database import db
-
-    if db is None:
-        return JSONResponse({"success": False, "error": "Database not available"}, status_code=500)
-
-    # Only admins can delete ratings
-    if not user.get("is_admin"):
-        return JSONResponse({"success": False, "error": "Admin access required"}, status_code=403)
-
-    try:
-        rating = await db["ratings"].find_one({"id": rating_id})
-        if not rating:
-            return JSONResponse({"success": False, "error": "Rating not found"}, status_code=404)
-
-        reviewed_company_id = rating.get("reviewed_company_id")
-
-        await db["ratings"].delete_one({"id": rating_id})
-
-        # Recalculate the reviewed company's average after deletion
-        pipeline = [
-            {"$match": {"reviewed_company_id": reviewed_company_id}},
-            {"$group": {
-                "_id": None,
-                "avg_rating": {"$avg": "$rating"},
-                "total_reviews": {"$sum": 1}
-            }}
-        ]
-        agg = await db["ratings"].aggregate(pipeline).to_list(1)
-        if agg:
-            avg = round(agg[0]["avg_rating"], 2)
-            total = agg[0]["total_reviews"]
-        else:
-            avg = 0.0
-            total = 0
-
-        await db["companies"].update_one(
-            {"id": reviewed_company_id},
-            {"$set": {"avg_rating": avg, "total_reviews": total}}
-        )
-
-        print(f"Admin deleted rating {rating_id}")
-
-        return JSONResponse({
-            "success": True,
-            "message": "Rating deleted successfully"
-        })
-
-    except Exception as e:
-        print(f"Error deleting rating: {e}")
-        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
-
-
-@app.get("/ratings/check/{order_id}")
-async def check_rating_eligibility(order_id: str, user: dict = Depends(require_login)):
-    """
-    Check if the current user can rate for a given order, and if they already have.
-    Used by the frontend to show/hide the rating button.
-    """
-    from fastapi.responses import JSONResponse
-    from database import db
-
-    if db is None:
-        return JSONResponse({"success": False, "error": "Database not available"}, status_code=500)
-
-    try:
-        rfq = await db["rfqs"].find_one({"id": order_id})
-        if not rfq:
-            return JSONResponse({"can_rate": False, "reason": "Order not found"})
-
-        rfq_status = rfq.get("status", "")
-        if rfq_status not in ("AWARDED", "CLOSED"):
-            return JSONResponse({"can_rate": False, "reason": "Order not yet completed"})
-
-        existing = await db["ratings"].find_one({
-            "order_id": order_id,
-            "reviewer_id": user.get("id")
-        })
-        if existing:
-            return JSONResponse({"can_rate": False, "reason": "Already rated", "already_rated": True})
-
-        return JSONResponse({"can_rate": True, "reason": "Eligible to rate"})
-
-    except Exception as e:
-        return JSONResponse({"can_rate": False, "reason": str(e)}, status_code=500)
-
-
-# --- Rating page (HTML) ---
-@app.get("/ratings/page/{order_id}", response_class=HTMLResponse)
-async def rating_page(request: Request, order_id: str, user: dict = Depends(require_login)):
-    """Render the rating submission page for a completed order."""
-    from database import db
-
-    if db is None:
-        raise HTTPException(status_code=500, detail="Database not available")
-
-    rfq = await db["rfqs"].find_one({"id": order_id})
-    if not rfq:
-        raise HTTPException(status_code=404, detail="Order not found")
-
-    if rfq.get("status") not in ("AWARDED", "CLOSED"):
-        raise HTTPException(status_code=403, detail="Order is not yet completed")
-
-    # Check if already rated
-    existing = await db["ratings"].find_one({"order_id": order_id, "reviewer_id": user.get("id")})
-
-    reviewer_company = await db["companies"].find_one({"id": user.get("company_id")})
-
-    return templates.TemplateResponse("rating_page.html", {
-        "request": request,
-        "user": user,
-        "rfq": rfq,
-        "already_rated": existing is not None,
-        "reviewer_company": reviewer_company,
-    })
-
-
-@app.get("/admin/ratings", response_class=HTMLResponse)
-async def admin_ratings_page(request: Request, user: dict = Depends(require_login)):
-    """Admin page to view and moderate all ratings."""
-    if not user.get("is_admin"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    return templates.TemplateResponse("admin_ratings.html", {"request": request, "user": user})
-
-
-@app.get("/api/admin/all-ratings")
-async def admin_get_all_ratings(user: dict = Depends(require_login)):
-    """Admin API: Get all ratings across the platform."""
-    from fastapi.responses import JSONResponse
-    from database import db
-
-    if not user.get("is_admin"):
-        return JSONResponse({"success": False, "error": "Admin access required"}, status_code=403)
-
-    if db is None:
-        return JSONResponse({"success": False, "error": "Database not available"}, status_code=500)
-
-    try:
-        cursor = db["ratings"].find({}, sort=[("created_at", -1)])
-        ratings = await cursor.to_list(length=1000)
-        for r in ratings:
-            r.pop("_id", None)
-
-        total = len(ratings)
-        avg = round(sum(r["rating"] for r in ratings) / total, 2) if total > 0 else 0.0
-
-        return JSONResponse({
-            "success": True,
-            "total": total,
-            "avg_rating": avg,
-            "ratings": ratings
-        })
-    except Exception as e:
-        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
-
-
-# ============================================================
-# MILESTONE TRACKING TIMELINE
-# ============================================================
-
-MILESTONE_STAGES = [
-    "Order Placed",
-    "Fabric Sourcing",
-    "Cutting",
-    "Sewing",
-    "Finishing",
-    "Shipping",
-]
-
-
-def _build_default_stages() -> list:
-    """Return the default ordered stage list with all stages pending."""
-    from models import MilestoneStageModel, MilestoneStatusEnum
-    stages = []
-    for name in MILESTONE_STAGES:
-        stages.append(MilestoneStageModel(
-            name=name,
-            status=MilestoneStatusEnum.PENDING,
-            timestamp=None,
-            note=None,
-        ).model_dump())
-    # Mark first stage as in_progress by default
-    stages[0]["status"] = "in_progress"
-    stages[0]["timestamp"] = datetime.utcnow().isoformat()
-    return stages
-
-
-@app.post("/milestones/create")
-async def create_milestone(request: Request, user: dict = Depends(require_login)):
-    """
-    Create a milestone timeline for an order.
-    Called when a bid is accepted / order is awarded.
-    Only the buyer who owns the RFQ (or an admin) can create the milestone.
-    """
-    from fastapi.responses import JSONResponse
-    from database import db
-    from models import OrderMilestoneModel
-
-    if db is None:
-        return JSONResponse({"success": False, "error": "Database not available"}, status_code=500)
-
-    try:
-        body = await request.json()
-        order_id = (body.get("order_id") or "").strip()
-
-        if not order_id:
-            return JSONResponse({"success": False, "error": "order_id is required"}, status_code=422)
-
-        # Verify the order exists
-        rfq = await db["rfqs"].find_one({"id": order_id})
-        if not rfq:
-            return JSONResponse({"success": False, "error": "Order not found"}, status_code=404)
-
-        # Only buyer of this RFQ or admin can create milestone
-        is_admin = user.get("is_admin", False)
-        user_company = await db["companies"].find_one({"id": user.get("company_id")})
-
-        is_buyer = (
-            rfq.get("buyer_id") == user.get("id") or
-            rfq.get("buyer_id") == user.get("company_id") or
-            (user_company and rfq.get("buyer_id") == user_company.get("id")) or
-            (user_company and rfq.get("buyer_id") == user_company.get("unique_id"))
-        )
-
-        if not is_admin and not is_buyer:
-            return JSONResponse({"success": False, "error": "Only the buyer or admin can create a milestone"}, status_code=403)
-
-        # Prevent duplicate milestone for same order
-        existing = await db["order_milestones"].find_one({"order_id": order_id})
-        if existing:
-            existing.pop("_id", None)
-            return JSONResponse({
-                "success": False,
-                "error": "Milestone already exists for this order",
-                "milestone": existing
-            }, status_code=409)
-
-        milestone = OrderMilestoneModel(
-            order_id=order_id,
-            current_stage="Order Placed",
-            stages=_build_default_stages(),
-        )
-
-        await db["order_milestones"].insert_one(milestone.model_dump())
-
-        print(f"Milestone created for order {order_id}")
-
-        return JSONResponse({
-            "success": True,
-            "message": "Milestone timeline created",
-            "milestone_id": milestone.id,
-            "order_id": order_id
-        })
-
-    except Exception as e:
-        print(f"Error creating milestone: {e}")
-        import traceback; traceback.print_exc()
-        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
-
-
-@app.put("/milestones/update")
-async def update_milestone(request: Request, user: dict = Depends(require_login)):
-    """
-    Supplier updates the current stage of an order milestone.
-    Advancing a stage marks the previous stage completed and the new one in_progress.
-    Supplier can also add a note to the current stage.
-    """
-    from fastapi.responses import JSONResponse
-    from database import db
-
-    if db is None:
-        return JSONResponse({"success": False, "error": "Database not available"}, status_code=500)
-
-    try:
-        body = await request.json()
-        order_id = (body.get("order_id") or "").strip()
-        new_stage = (body.get("stage") or "").strip()
-        note = (body.get("note") or "").strip() or None
-
-        if not order_id:
-            return JSONResponse({"success": False, "error": "order_id is required"}, status_code=422)
-        if not new_stage:
-            return JSONResponse({"success": False, "error": "stage is required"}, status_code=422)
-        if new_stage not in MILESTONE_STAGES:
-            return JSONResponse({
-                "success": False,
-                "error": f"Invalid stage. Must be one of: {', '.join(MILESTONE_STAGES)}"
-            }, status_code=422)
-
-        # Fetch milestone
-        milestone = await db["order_milestones"].find_one({"order_id": order_id})
-        if not milestone:
-            return JSONResponse({"success": False, "error": "Milestone not found for this order"}, status_code=404)
-
-        # Verify the user is the supplier for this order (has a bid on it) or admin
-        is_admin = user.get("is_admin", False)
-        user_company = await db["companies"].find_one({"id": user.get("company_id")})
-
-        if not is_admin:
-            if not user_company or user_company.get("role") != "SUPPLIER":
-                return JSONResponse({"success": False, "error": "Only suppliers can update milestones"}, status_code=403)
-
-            # Verify this supplier has a bid on this order
-            supplier_bid = await db["bids"].find_one({
-                "rfq_id": order_id,
-                "supplier_id": user_company.get("unique_id")
-            })
-            if not supplier_bid:
-                return JSONResponse({
-                    "success": False,
-                    "error": "You did not participate in this order"
-                }, status_code=403)
-
-        # Update stages list
-        stages = milestone.get("stages", [])
-        new_stage_idx = MILESTONE_STAGES.index(new_stage)
-        now_iso = datetime.utcnow().isoformat()
-
-        for i, stage in enumerate(stages):
-            if i < new_stage_idx:
-                stage["status"] = "completed"
-                if not stage.get("timestamp"):
-                    stage["timestamp"] = now_iso
-            elif i == new_stage_idx:
-                stage["status"] = "in_progress"
-                stage["timestamp"] = now_iso
-                if note:
-                    stage["note"] = note
-            else:
-                stage["status"] = "pending"
-                stage["timestamp"] = None
-
-        await db["order_milestones"].update_one(
-            {"order_id": order_id},
-            {"$set": {
-                "current_stage": new_stage,
-                "stages": stages,
-                "updated_at": now_iso
-            }}
-        )
-
-        print(f"Milestone updated: order={order_id}, stage={new_stage}, supplier={user_company.get('name') if user_company else 'admin'}")
-
-        return JSONResponse({
-            "success": True,
-            "message": f"Stage updated to '{new_stage}'",
-            "current_stage": new_stage,
-            "stages": stages
-        })
-
-    except Exception as e:
-        print(f"Error updating milestone: {e}")
-        import traceback; traceback.print_exc()
-        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
-
-
-@app.get("/milestones/{order_id}")
-async def get_milestone(order_id: str, request: Request):
-    """
-    Get the milestone timeline for an order.
-    Public — both buyer and supplier can view.
-    """
-    from fastapi.responses import JSONResponse
-    from database import db
-
-    if db is None:
-        return JSONResponse({"success": False, "error": "Database not available"}, status_code=500)
-
-    try:
-        milestone = await db["order_milestones"].find_one({"order_id": order_id})
-        if not milestone:
-            return JSONResponse({"success": False, "error": "No milestone found for this order"}, status_code=404)
-
-        milestone.pop("_id", None)
-
-        # Attach RFQ title for context
-        rfq = await db["rfqs"].find_one({"id": order_id})
-        rfq_title = rfq.get("title", "Unknown Order") if rfq else "Unknown Order"
-
-        return JSONResponse({
-            "success": True,
-            "rfq_title": rfq_title,
-            "milestone": milestone
-        })
-
-    except Exception as e:
-        print(f"Error fetching milestone: {e}")
-        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
-
-
-# --- Milestone page (HTML) ---
-@app.get("/milestones/page/{order_id}", response_class=HTMLResponse)
-async def milestone_page(
-    request: Request,
-    order_id: str,
-    user: Optional[dict] = Depends(get_current_user)
-):
-    """Render the milestone timeline page for an order."""
-    from database import db
-
-    if db is None:
-        raise HTTPException(status_code=500, detail="Database not available")
-
-    rfq = await db["rfqs"].find_one({"id": order_id})
-    if not rfq:
-        raise HTTPException(status_code=404, detail="Order not found")
-
-    user_company = None
-    is_supplier = False
-    is_buyer = False
-
-    if user:
-        user_company = await db["companies"].find_one({"id": user.get("company_id")})
-        if user_company:
-            role = user_company.get("role", "")
-            is_supplier = role == "SUPPLIER"
-            is_buyer = (
-                role == "BUYER" or
-                rfq.get("buyer_id") == user.get("id") or
-                rfq.get("buyer_id") == user.get("company_id") or
-                rfq.get("buyer_id") == user_company.get("id") or
-                rfq.get("buyer_id") == user_company.get("unique_id")
-            )
-
-    return templates.TemplateResponse("milestone_page.html", {
-        "request": request,
-        "user": user,
-        "rfq": rfq,
-        "user_company": user_company,
-        "is_supplier": is_supplier,
-        "is_buyer": is_buyer,
-        "milestone_stages": MILESTONE_STAGES,
-    })
-
-
-# ============================================================
-# FACTORY CAPACITY MANAGEMENT
-# ============================================================
-
-@app.put("/capacity/update")
-async def update_capacity(request: Request, user: dict = Depends(require_login)):
-    """
-    Supplier sets or updates their monthly production capacity.
-    Creates the record if it doesn't exist yet (upsert).
-    """
-    from fastapi.responses import JSONResponse
-    from database import db
-    from models import SupplierCapacityModel
-
-    if db is None:
-        return JSONResponse({"success": False, "error": "Database not available"}, status_code=500)
-
-    try:
-        body = await request.json()
-        total_capacity = body.get("total_capacity")
-        available_capacity = body.get("available_capacity")
-
-        # --- Validation ---
-        errors = {}
-        if total_capacity is None:
-            errors["total_capacity"] = "Total capacity is required"
-        else:
-            try:
-                total_capacity = int(total_capacity)
-                if total_capacity <= 0:
-                    errors["total_capacity"] = "Total capacity must be greater than 0"
-            except (ValueError, TypeError):
-                errors["total_capacity"] = "Total capacity must be a positive integer"
-
-        if available_capacity is None:
-            errors["available_capacity"] = "Available capacity is required"
-        else:
-            try:
-                available_capacity = int(available_capacity)
-                if available_capacity < 0:
-                    errors["available_capacity"] = "Available capacity cannot be negative"
-            except (ValueError, TypeError):
-                errors["available_capacity"] = "Available capacity must be a non-negative integer"
-
-        if not errors and available_capacity > total_capacity:
-            errors["available_capacity"] = "Available capacity cannot exceed total capacity"
-
-        if errors:
-            return JSONResponse({"success": False, "errors": errors}, status_code=422)
-
-        # --- Verify user is a supplier ---
-        company = await db["companies"].find_one({"id": user.get("company_id")})
-        if not company:
-            return JSONResponse({"success": False, "error": "Company not found"}, status_code=404)
-
-        is_admin = user.get("is_admin", False)
-        if not is_admin and company.get("role") != "SUPPLIER":
-            return JSONResponse({"success": False, "error": "Only suppliers can set capacity"}, status_code=403)
-
-        now = datetime.utcnow()
-
-        # Upsert — update if exists, create if not
-        existing = await db["supplier_capacity"].find_one({"supplier_id": company.get("id")})
-
-        if existing:
-            reserved = existing.get("reserved_capacity", 0)
-            # Ensure available doesn't go below reserved
-            if available_capacity < reserved:
-                return JSONResponse({
-                    "success": False,
-                    "error": f"Available capacity ({available_capacity:,}) cannot be less than already reserved capacity ({reserved:,} units from confirmed orders)"
-                }, status_code=422)
-
-            await db["supplier_capacity"].update_one(
-                {"supplier_id": company.get("id")},
-                {"$set": {
-                    "total_capacity": total_capacity,
-                    "available_capacity": available_capacity,
-                    "last_updated": now,
-                    "updated_by": user.get("id"),
-                    "supplier_name": company.get("name"),
-                }}
-            )
-            message = "Capacity updated successfully"
-        else:
-            capacity = SupplierCapacityModel(
-                supplier_id=company.get("id"),
-                supplier_name=company.get("name", ""),
-                total_capacity=total_capacity,
-                available_capacity=available_capacity,
-                reserved_capacity=0,
-                last_updated=now,
-                updated_by=user.get("id"),
-            )
-            await db["supplier_capacity"].insert_one(capacity.model_dump())
-            message = "Capacity record created successfully"
-
-        print(f"Capacity updated: {company.get('name')} — total={total_capacity:,}, available={available_capacity:,}")
-
-        return JSONResponse({
-            "success": True,
-            "message": message,
-            "total_capacity": total_capacity,
-            "available_capacity": available_capacity,
-        })
-
-    except Exception as e:
-        print(f"Error updating capacity: {e}")
-        import traceback; traceback.print_exc()
-        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
-
-
-@app.get("/capacity/{supplier_id}")
-async def get_capacity(supplier_id: str):
-    """
-    Get capacity info for a supplier (by company ID).
-    Public — buyers can view before placing orders.
-    """
-    from fastapi.responses import JSONResponse
-    from database import db
-
-    if db is None:
-        return JSONResponse({"success": False, "error": "Database not available"}, status_code=500)
-
-    try:
-        company = await db["companies"].find_one({"id": supplier_id})
-        if not company:
-            return JSONResponse({"success": False, "error": "Supplier not found"}, status_code=404)
-
-        capacity = await db["supplier_capacity"].find_one({"supplier_id": supplier_id})
-
-        if not capacity:
-            return JSONResponse({
-                "success": True,
-                "has_capacity_data": False,
-                "supplier_name": company.get("name"),
-                "message": "This supplier has not set their capacity yet"
-            })
-
-        capacity.pop("_id", None)
-
-        total = capacity.get("total_capacity", 0)
-        available = capacity.get("available_capacity", 0)
-        reserved = capacity.get("reserved_capacity", 0)
-        utilization_pct = round(((total - available) / total) * 100, 1) if total > 0 else 0
-
-        return JSONResponse({
-            "success": True,
-            "has_capacity_data": True,
-            "supplier_name": company.get("name"),
-            "capacity": capacity,
-            "utilization_pct": utilization_pct,
-            "is_available": available > 0,
-        })
-
-    except Exception as e:
-        print(f"Error fetching capacity: {e}")
-        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
-
-
-@app.post("/capacity/check")
-async def check_capacity(request: Request):
-    """
-    Check if a supplier can fulfil a given order quantity.
-    Returns: can_fulfil, available_capacity, shortfall, suggestions.
-    Used by buyers before confirming an order.
-    """
-    from fastapi.responses import JSONResponse
-    from database import db
-
-    if db is None:
-        return JSONResponse({"success": False, "error": "Database not available"}, status_code=500)
-
-    try:
-        body = await request.json()
-        supplier_id = (body.get("supplier_id") or "").strip()
-        order_quantity = body.get("order_quantity")
-
-        if not supplier_id:
-            return JSONResponse({"success": False, "error": "supplier_id is required"}, status_code=422)
-        if order_quantity is None:
-            return JSONResponse({"success": False, "error": "order_quantity is required"}, status_code=422)
-
-        try:
-            order_quantity = int(order_quantity)
-            if order_quantity <= 0:
-                return JSONResponse({"success": False, "error": "order_quantity must be positive"}, status_code=422)
-        except (ValueError, TypeError):
-            return JSONResponse({"success": False, "error": "order_quantity must be a positive integer"}, status_code=422)
-
-        capacity = await db["supplier_capacity"].find_one({"supplier_id": supplier_id})
-
-        if not capacity:
-            return JSONResponse({
-                "success": True,
-                "can_fulfil": None,
-                "warning": "This supplier has not published their capacity. Proceed with caution.",
-                "available_capacity": None,
-                "order_quantity": order_quantity,
-            })
-
-        available = capacity.get("available_capacity", 0)
-        total = capacity.get("total_capacity", 0)
-        can_fulfil = available >= order_quantity
-        shortfall = max(0, order_quantity - available)
-
-        # Build suggestions when capacity is exceeded
-        suggestions = []
-        if not can_fulfil:
-            # Suggestion 1: split order
-            if available > 0:
-                suggestions.append({
-                    "type": "split",
-                    "title": "Split the Order",
-                    "description": f"Place {available:,} units with this supplier now, and source the remaining {shortfall:,} units from another supplier.",
-                    "split_qty_here": available,
-                    "split_qty_elsewhere": shortfall,
-                })
-            # Suggestion 2: find other suppliers with enough capacity
-            other_suppliers_cursor = db["supplier_capacity"].find({
-                "supplier_id": {"$ne": supplier_id},
-                "available_capacity": {"$gte": order_quantity}
-            })
-            other_suppliers = await other_suppliers_cursor.to_list(length=5)
-            for s in other_suppliers:
-                s.pop("_id", None)
-                suggestions.append({
-                    "type": "alternative_supplier",
-                    "title": f"Try {s.get('supplier_name', 'Another Supplier')}",
-                    "description": f"Available capacity: {s.get('available_capacity', 0):,} units — can fulfil your full order.",
-                    "supplier_id": s.get("supplier_id"),
-                    "supplier_name": s.get("supplier_name"),
-                    "available_capacity": s.get("available_capacity"),
-                })
-
-        return JSONResponse({
-            "success": True,
-            "can_fulfil": can_fulfil,
-            "available_capacity": available,
-            "total_capacity": total,
-            "order_quantity": order_quantity,
-            "shortfall": shortfall,
-            "utilization_pct": round(((total - available) / total) * 100, 1) if total > 0 else 0,
-            "suggestions": suggestions,
-        })
-
-    except Exception as e:
-        print(f"Error checking capacity: {e}")
-        import traceback; traceback.print_exc()
-        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
-
-
-@app.post("/capacity/deduct")
-async def deduct_capacity(request: Request, user: dict = Depends(require_login)):
-    """
-    Deduct capacity when an order is confirmed (called internally or by admin/buyer).
-    """
-    from fastapi.responses import JSONResponse
-    from database import db
-
-    if db is None:
-        return JSONResponse({"success": False, "error": "Database not available"}, status_code=500)
-
-    try:
-        body = await request.json()
-        supplier_id = (body.get("supplier_id") or "").strip()
-        quantity = int(body.get("quantity", 0))
-
-        if not supplier_id or quantity <= 0:
-            return JSONResponse({"success": False, "error": "supplier_id and positive quantity required"}, status_code=422)
-
-        capacity = await db["supplier_capacity"].find_one({"supplier_id": supplier_id})
-        if not capacity:
-            return JSONResponse({"success": False, "error": "No capacity record found for this supplier"}, status_code=404)
-
-        available = capacity.get("available_capacity", 0)
-        reserved = capacity.get("reserved_capacity", 0)
-
-        if available < quantity:
-            return JSONResponse({
-                "success": False,
-                "error": f"Insufficient capacity. Available: {available:,}, Requested: {quantity:,}"
-            }, status_code=422)
-
-        await db["supplier_capacity"].update_one(
-            {"supplier_id": supplier_id},
-            {"$inc": {
-                "available_capacity": -quantity,
-                "reserved_capacity": quantity
-            }, "$set": {"last_updated": datetime.utcnow()}}
-        )
-
-        return JSONResponse({
-            "success": True,
-            "message": f"Deducted {quantity:,} units from available capacity",
-            "new_available": available - quantity,
-            "new_reserved": reserved + quantity,
-        })
-
-    except Exception as e:
-        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
-
-
-@app.post("/capacity/restore")
-async def restore_capacity(request: Request, user: dict = Depends(require_login)):
-    """
-    Restore capacity when an order is cancelled.
-    """
-    from fastapi.responses import JSONResponse
-    from database import db
-
-    if db is None:
-        return JSONResponse({"success": False, "error": "Database not available"}, status_code=500)
-
-    try:
-        body = await request.json()
-        supplier_id = (body.get("supplier_id") or "").strip()
-        quantity = int(body.get("quantity", 0))
-
-        if not supplier_id or quantity <= 0:
-            return JSONResponse({"success": False, "error": "supplier_id and positive quantity required"}, status_code=422)
-
-        capacity = await db["supplier_capacity"].find_one({"supplier_id": supplier_id})
-        if not capacity:
-            return JSONResponse({"success": False, "error": "No capacity record found"}, status_code=404)
-
-        total = capacity.get("total_capacity", 0)
-        available = capacity.get("available_capacity", 0)
-        reserved = max(0, capacity.get("reserved_capacity", 0) - quantity)
-        new_available = min(total, available + quantity)
-
-        await db["supplier_capacity"].update_one(
-            {"supplier_id": supplier_id},
-            {"$set": {
-                "available_capacity": new_available,
-                "reserved_capacity": reserved,
-                "last_updated": datetime.utcnow()
-            }}
-        )
-
-        return JSONResponse({
-            "success": True,
-            "message": f"Restored {quantity:,} units to available capacity",
-            "new_available": new_available,
-            "new_reserved": reserved,
-        })
-
-    except Exception as e:
-        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
-
-
-@app.get("/api/admin/capacities")
-async def admin_get_all_capacities(user: dict = Depends(require_login)):
-    """Admin: Get all supplier capacity records for monitoring."""
-    from fastapi.responses import JSONResponse
-    from database import db
-
-    if not user.get("is_admin"):
-        return JSONResponse({"success": False, "error": "Admin access required"}, status_code=403)
-
-    if db is None:
-        return JSONResponse({"success": False, "error": "Database not available"}, status_code=500)
-
-    try:
-        cursor = db["supplier_capacity"].find({}, sort=[("last_updated", -1)])
-        records = await cursor.to_list(length=500)
-        for r in records:
-            r.pop("_id", None)
-            total = r.get("total_capacity", 0)
-            available = r.get("available_capacity", 0)
-            r["utilization_pct"] = round(((total - available) / total) * 100, 1) if total > 0 else 0
-
-        return JSONResponse({"success": True, "capacities": records, "total": len(records)})
-
-    except Exception as e:
-        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
-
-
-@app.get("/admin/capacities", response_class=HTMLResponse)
-async def admin_capacities_page(request: Request, user: dict = Depends(require_login)):
-    """Admin page to monitor all supplier capacities."""
-    if not user.get("is_admin"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    return templates.TemplateResponse("admin_capacities.html", {"request": request, "user": user})
-
-
-# ============================================================
-# AI-BASED BID RECOMMENDATIONS
-# ============================================================
-
-async def _get_ai_settings() -> dict:
-    """Fetch AI settings from DB, falling back to defaults."""
-    from database import db
-    if db is None:
-        return {"min_profit_margin_pct": 10.0, "max_market_adjustment_pct": 25.0, "underbid_protection": True}
-    settings = await db["ai_settings"].find_one({"id": "ai_settings"})
-    if not settings:
-        return {"min_profit_margin_pct": 10.0, "max_market_adjustment_pct": 25.0, "underbid_protection": True}
-    return settings
-
-
-async def _compute_market_adjustment(rfq_id: Optional[str], base_cost: float) -> tuple[float, float, list]:
-    """
-    Analyse historical bids for this RFQ category to derive a market adjustment.
-    Returns: (adjustment_amount, confidence_score, reasoning_bullets)
-    """
-    from database import db
-    reasoning = []
-    adjustment = 0.0
-    confidence = 0.5  # default medium
-
-    if db is None or not rfq_id:
-        reasoning.append("No historical data available — using default market adjustment.")
-        return adjustment, confidence, reasoning
-
-    # Fetch the RFQ to get category
-    rfq = await db["rfqs"].find_one({"id": rfq_id})
-    category = rfq.get("product_category", "") if rfq else ""
-
-    # Get all bids for RFQs in the same product category (last 90 days)
-    cutoff = datetime.utcnow() - timedelta(days=90)
-    similar_rfqs = await db["rfqs"].find(
-        {"product_category": category, "status": {"$in": ["AWARDED", "CLOSED"]}}
-    ).to_list(length=50)
-
-    similar_rfq_ids = [r["id"] for r in similar_rfqs]
-
-    if not similar_rfq_ids:
-        reasoning.append(f"No completed orders found for '{category}' — using neutral market adjustment.")
-        return 0.0, 0.45, reasoning
-
-    # Fetch bids for those RFQs
-    bids_cursor = db["bids"].find(
-        {"rfq_id": {"$in": similar_rfq_ids}, "status": {"$ne": "CANCELLED"}}
-    )
-    bids = await bids_cursor.to_list(length=200)
-
-    if not bids:
-        reasoning.append(f"No bid history found for '{category}' — using neutral market adjustment.")
-        return 0.0, 0.45, reasoning
-
-    prices = [b["bid_price"] for b in bids if b.get("bid_price", 0) > 0]
-    if not prices:
-        return 0.0, 0.45, reasoning
-
-    avg_market = sum(prices) / len(prices)
-    min_market = min(prices)
-    max_market = max(prices)
-
-    reasoning.append(f"Analysed {len(prices)} historical bids in '{category}'.")
-    reasoning.append(f"Market range: ${min_market:.2f} – ${max_market:.2f} per unit (avg ${avg_market:.2f}).")
-
-    # Adjustment: nudge toward market average
-    if avg_market > base_cost:
-        # Market pays more than our cost — positive adjustment
-        raw_adj = (avg_market - base_cost) * 0.3  # take 30% of the gap
-        adjustment = round(raw_adj, 4)
-        reasoning.append(f"Market average is above your base cost — adding ${adjustment:.2f} market premium.")
-    else:
-        # Market is tight — small negative adjustment to stay competitive
-        raw_adj = (avg_market - base_cost) * 0.15
-        adjustment = round(raw_adj, 4)
-        reasoning.append(f"Market is competitive — applying ${adjustment:.2f} competitive adjustment.")
-
-    # Confidence based on sample size
-    if len(prices) >= 20:
-        confidence = 0.88
-    elif len(prices) >= 8:
-        confidence = 0.72
-    elif len(prices) >= 3:
-        confidence = 0.58
-    else:
-        confidence = 0.42
-
-    reasoning.append(f"Confidence based on {len(prices)} data points.")
-    return adjustment, confidence, reasoning
-
-
-@app.post("/ai/recommend-bid")
-async def recommend_bid(request: Request, user: dict = Depends(require_login)):
-    """
-    Generate an AI bid recommendation for a supplier.
-    Inputs: material_cost, labor_cost, shipping_cost, quantity, rfq_id (optional)
-    Returns: suggested_price, price_range, confidence, reasoning
-    """
-    from fastapi.responses import JSONResponse
-    from database import db
-    from models import BidRecommendationModel
-
-    if db is None:
-        return JSONResponse({"success": False, "error": "Database not available"}, status_code=500)
-
-    try:
-        body = await request.json()
-
-        # --- Parse inputs ---
-        errors = {}
-        def parse_positive_float(key, label):
-            val = body.get(key)
-            if val is None:
-                errors[key] = f"{label} is required"
-                return None
-            try:
-                v = float(val)
-                if v < 0:
-                    errors[key] = f"{label} cannot be negative"
-                    return None
-                return v
-            except (ValueError, TypeError):
-                errors[key] = f"{label} must be a number"
-                return None
-
-        material_cost = parse_positive_float("material_cost", "Material cost")
-        labor_cost    = parse_positive_float("labor_cost",    "Labor cost")
-        shipping_cost = parse_positive_float("shipping_cost", "Shipping cost")
-        quantity      = body.get("quantity")
-        rfq_id        = (body.get("rfq_id") or "").strip() or None
-
-        if quantity is not None:
-            try:
-                quantity = int(quantity)
-                if quantity <= 0:
-                    errors["quantity"] = "Quantity must be positive"
-            except (ValueError, TypeError):
-                errors["quantity"] = "Quantity must be a positive integer"
-        else:
-            quantity = 1  # default to per-unit calculation
-
-        if errors:
-            return JSONResponse({"success": False, "errors": errors}, status_code=422)
-
-        # --- Verify supplier ---
-        company = await db["companies"].find_one({"id": user.get("company_id")})
-        if not company:
-            return JSONResponse({"success": False, "error": "Company not found"}, status_code=404)
-
-        # --- Load AI settings ---
-        settings = await _get_ai_settings()
-        min_margin_pct   = float(settings.get("min_profit_margin_pct", 10.0))
-        underbid_protect = bool(settings.get("underbid_protection", True))
-
-        # --- Core calculation ---
-        # Per-unit costs
-        total_material = material_cost
-        total_labor    = labor_cost
-        total_shipping = shipping_cost / max(quantity, 1)  # spread shipping across units
-
-        base_cost = round(total_material + total_labor + total_shipping, 4)
-
-        reasoning = []
-        reasoning.append(f"Base cost breakdown: Material ${total_material:.2f} + Labor ${total_labor:.2f} + Shipping ${total_shipping:.4f}/unit = ${base_cost:.4f}/unit.")
-
-        # --- Market adjustment from historical data ---
-        market_adj, confidence, market_reasoning = await _compute_market_adjustment(rfq_id, base_cost)
-        reasoning.extend(market_reasoning)
-
-        # --- Profit margin ---
-        # Use min margin as floor; scale up slightly based on confidence
-        effective_margin_pct = min_margin_pct + (confidence * 5)  # e.g. 10% + up to 5% bonus
-        profit_amount = round(base_cost * (effective_margin_pct / 100), 4)
-        reasoning.append(f"Profit margin applied: {effective_margin_pct:.1f}% = ${profit_amount:.4f}/unit.")
-
-        # --- Suggested price ---
-        suggested_price = round(base_cost + profit_amount + market_adj, 2)
-
-        # --- Underbid protection ---
-        min_allowed = round(base_cost * (1 + min_margin_pct / 100), 2)
-        if underbid_protect and suggested_price < min_allowed:
-            suggested_price = min_allowed
-            reasoning.append(f"⚠ Price adjusted up to minimum allowed (${min_allowed:.2f}) to protect your margin.")
-
-        # --- Price range (±8–12% around suggested) ---
-        spread_pct = 0.08 + (1 - confidence) * 0.04  # wider range when less confident
-        price_range_min = round(max(min_allowed, suggested_price * (1 - spread_pct)), 2)
-        price_range_max = round(suggested_price * (1 + spread_pct), 2)
-
-        reasoning.append(f"Suggested range: ${price_range_min:.2f} – ${price_range_max:.2f} per unit.")
-
-        # --- Confidence label ---
-        if confidence >= 0.80:
-            confidence_label = "High"
-        elif confidence >= 0.60:
-            confidence_label = "Medium"
-        else:
-            confidence_label = "Low"
-
-        # --- Buyer preference hint (from RFQ target price) ---
-        if rfq_id:
-            rfq = await db["rfqs"].find_one({"id": rfq_id})
-            if rfq and rfq.get("target_price"):
-                target = float(rfq["target_price"])
-                if suggested_price > target:
-                    reasoning.append(f"💡 Buyer's target price is ${target:.2f}/unit — your suggestion is ${suggested_price - target:.2f} above it. Consider the lower end of the range to stay competitive.")
-                else:
-                    reasoning.append(f"✅ Your suggested price (${suggested_price:.2f}) is within the buyer's target of ${target:.2f}/unit.")
-
-        # --- Save recommendation ---
-        rec = BidRecommendationModel(
-            supplier_id=company.get("id"),
-            supplier_name=company.get("name", ""),
-            rfq_id=rfq_id,
-            input_costs={
-                "material_cost": material_cost,
-                "labor_cost": labor_cost,
-                "shipping_cost": shipping_cost,
-                "quantity": quantity,
-            },
-            base_cost=base_cost,
-            suggested_price=suggested_price,
-            price_range_min=price_range_min,
-            price_range_max=price_range_max,
-            profit_margin_pct=round(effective_margin_pct, 2),
-            market_adjustment=market_adj,
-            confidence_score=round(confidence, 2),
-            confidence_label=confidence_label,
-            reasoning=reasoning,
-        )
-        await db["bid_recommendations"].insert_one(rec.model_dump())
-
-        print(f"AI Bid Recommendation: {company.get('name')} → ${suggested_price:.2f}/unit (confidence: {confidence_label})")
-
-        return JSONResponse({
-            "success": True,
-            "recommendation_id": rec.id,
-            "base_cost": base_cost,
-            "suggested_price": suggested_price,
-            "price_range_min": price_range_min,
-            "price_range_max": price_range_max,
-            "profit_margin_pct": round(effective_margin_pct, 2),
-            "market_adjustment": market_adj,
-            "confidence_score": round(confidence, 2),
-            "confidence_label": confidence_label,
-            "reasoning": reasoning,
-        })
-
-    except Exception as e:
-        print(f"Error generating bid recommendation: {e}")
-        import traceback; traceback.print_exc()
-        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
-
-
-@app.get("/ai/history/{supplier_id}")
-async def get_recommendation_history(supplier_id: str, user: dict = Depends(require_login)):
-    """
-    Get past AI bid recommendations for a supplier.
-    Supplier can only see their own history; admins can see anyone's.
-    """
-    from fastapi.responses import JSONResponse
-    from database import db
-
-    if db is None:
-        return JSONResponse({"success": False, "error": "Database not available"}, status_code=500)
-
-    # Access control
-    is_admin = user.get("is_admin", False)
-    user_company = await db["companies"].find_one({"id": user.get("company_id")})
-    if not is_admin and (not user_company or user_company.get("id") != supplier_id):
-        return JSONResponse({"success": False, "error": "Access denied"}, status_code=403)
-
-    try:
-        cursor = db["bid_recommendations"].find(
-            {"supplier_id": supplier_id},
-            sort=[("created_at", -1)]
-        )
-        records = await cursor.to_list(length=50)
-        for r in records:
-            r.pop("_id", None)
-
-        return JSONResponse({
-            "success": True,
-            "supplier_id": supplier_id,
-            "total": len(records),
-            "history": records
-        })
-
-    except Exception as e:
-        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
-
-
-# --- Admin: get/update AI settings ---
-@app.get("/api/admin/ai-settings")
-async def get_ai_settings_api(user: dict = Depends(require_login)):
-    """Admin: Get current AI recommendation settings."""
-    from fastapi.responses import JSONResponse
-    if not user.get("is_admin"):
-        return JSONResponse({"success": False, "error": "Admin access required"}, status_code=403)
-    settings = await _get_ai_settings()
-    settings.pop("_id", None)
-    return JSONResponse({"success": True, "settings": settings})
-
-
-@app.put("/api/admin/ai-settings")
-async def update_ai_settings(request: Request, user: dict = Depends(require_login)):
-    """Admin: Update AI recommendation settings (min margin, underbid protection)."""
-    from fastapi.responses import JSONResponse
-    from database import db
-
-    if not user.get("is_admin"):
-        return JSONResponse({"success": False, "error": "Admin access required"}, status_code=403)
-    if db is None:
-        return JSONResponse({"success": False, "error": "Database not available"}, status_code=500)
-
-    try:
-        body = await request.json()
-        errors = {}
-
-        min_margin = body.get("min_profit_margin_pct")
-        max_adj    = body.get("max_market_adjustment_pct")
-        underbid   = body.get("underbid_protection")
-
-        if min_margin is not None:
-            try:
-                min_margin = float(min_margin)
-                if not (0 <= min_margin <= 100):
-                    errors["min_profit_margin_pct"] = "Must be between 0 and 100"
-            except (ValueError, TypeError):
-                errors["min_profit_margin_pct"] = "Must be a number"
-
-        if max_adj is not None:
-            try:
-                max_adj = float(max_adj)
-                if not (0 <= max_adj <= 100):
-                    errors["max_market_adjustment_pct"] = "Must be between 0 and 100"
-            except (ValueError, TypeError):
-                errors["max_market_adjustment_pct"] = "Must be a number"
-
-        if errors:
-            return JSONResponse({"success": False, "errors": errors}, status_code=422)
-
-        update = {"updated_at": datetime.utcnow(), "updated_by": user.get("id")}
-        if min_margin is not None: update["min_profit_margin_pct"] = min_margin
-        if max_adj    is not None: update["max_market_adjustment_pct"] = max_adj
-        if underbid   is not None: update["underbid_protection"] = bool(underbid)
-
-        await db["ai_settings"].update_one(
-            {"id": "ai_settings"},
-            {"$set": update},
-            upsert=True
-        )
-
-        print(f"AI settings updated by admin {user.get('id')}: {update}")
-        return JSONResponse({"success": True, "message": "AI settings updated", "settings": update})
-
-    except Exception as e:
-        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
-
-
-# --- Standalone AI recommendation page ---
-@app.get("/ai/recommend", response_class=HTMLResponse)
-async def ai_recommend_page(
-    request: Request,
-    rfq_id: Optional[str] = None,
-    user: dict = Depends(require_login)
-):
-    """Render the AI bid recommendation tool page."""
-    from database import db
-
-    rfq = None
-    if rfq_id and db is not None:
-        rfq = await db["rfqs"].find_one({"id": rfq_id})
-
-    company = None
-    if db is not None:
-        company = await db["companies"].find_one({"id": user.get("company_id")})
-
-    return templates.TemplateResponse("ai_recommend.html", {
-        "request": request,
-        "user": user,
-        "company": company,
-        "rfq": rfq,
-        "rfq_id": rfq_id or "",
-    })
-
-
-@app.get("/admin/ai-settings", response_class=HTMLResponse)
-async def admin_ai_settings_page(request: Request, user: dict = Depends(require_login)):
-    """Admin page to configure AI bid recommendation settings."""
-    if not user.get("is_admin"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    return templates.TemplateResponse("admin_ai_settings.html", {"request": request, "user": user})
-
-
-# ── /api/me alias (used by frontend JS) ──────────────────────────────────────
-@app.get("/api/me")
-async def api_me_alias(user: Optional[dict] = Depends(get_current_user)):
-    """
-    Lightweight /api/me for frontend JS (session-cookie based).
-    Returns user + company summary. Returns 401 if not logged in.
-    """
-    from database import db
-
-    if not user:
-        return JSONResponse({"success": False, "error": "Not authenticated"}, status_code=401)
-
-    company = None
-    if db is not None:
-        company = await db["companies"].find_one({"id": user.get("company_id")})
-
-    return JSONResponse({
-        "success": True,
-        "user": {
-            "id":       user.get("id"),
-            "email":    user.get("email"),
-            "is_admin": user.get("is_admin", False),
-        },
-        "company": {
-            "id":                company.get("id")                if company else None,
-            "name":              company.get("name")              if company else None,
-            "role":              company.get("role")              if company else None,
-            "unique_id":         company.get("unique_id")         if company else None,
-            "subscription_tier": company.get("subscription_tier", "FREE") if company else "FREE",
-            "avg_rating":        company.get("avg_rating", 0)     if company else 0,
-            "total_reviews":     company.get("total_reviews", 0)  if company else 0,
-        } if company else None,
-    })
+# =====================================================    })
