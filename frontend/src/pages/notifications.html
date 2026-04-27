@@ -1,0 +1,293 @@
+{% extends "base.html" %}
+
+{% block title %}Notifications - TexBid{% endblock %}
+
+{% block content %}
+<div class="bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen py-12">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <!-- Header -->
+        <div class="mb-8">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-3">
+                    <svg class="h-10 w-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+                    </svg>
+                    <h1 class="text-4xl font-bold text-gray-900">Notifications</h1>
+                </div>
+                <button id="mark-all-read-page" class="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors text-sm">
+                    Mark all as read
+                </button>
+            </div>
+            <p class="text-lg text-gray-600">Stay updated with all your activities</p>
+        </div>
+
+        <!-- Filter Tabs -->
+        <div class="mb-6 flex gap-2 border-b border-gray-200">
+            <button class="filter-tab active px-4 py-2 font-semibold text-blue-600 border-b-2 border-blue-600" data-filter="all">
+                All
+            </button>
+            <button class="filter-tab px-4 py-2 font-semibold text-gray-600 hover:text-blue-600 transition-colors" data-filter="unread">
+                Unread
+            </button>
+            <button class="filter-tab px-4 py-2 font-semibold text-gray-600 hover:text-blue-600 transition-colors" data-filter="bids">
+                Bids
+            </button>
+            <button class="filter-tab px-4 py-2 font-semibold text-gray-600 hover:text-blue-600 transition-colors" data-filter="auctions">
+                Auctions
+            </button>
+            <button class="filter-tab px-4 py-2 font-semibold text-gray-600 hover:text-blue-600 transition-colors" data-filter="payments">
+                Payments
+            </button>
+        </div>
+
+        <!-- Notifications List -->
+        <div id="notifications-container" class="space-y-3">
+            <!-- Loading state -->
+            <div class="bg-white rounded-lg shadow-md p-12 text-center">
+                <svg class="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <p class="text-gray-600">Loading notifications...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentFilter = 'all';
+    let allNotifications = [];
+
+    // Load notifications
+    async function loadNotifications() {
+        try {
+            console.log('🔄 Fetching notifications...');
+            const response = await fetch('/api/notifications?limit=100');
+            
+            console.log('📡 Response status:', response.status);
+            
+            // Check if response is ok
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log('📦 Received data:', data);
+            
+            // Validate data structure
+            if (!data || typeof data !== 'object') {
+                throw new Error('Invalid response format: expected object');
+            }
+            
+            if (!Array.isArray(data.notifications)) {
+                console.error('❌ data.notifications is not an array:', data.notifications);
+                throw new Error('Invalid response format: notifications is not an array');
+            }
+            
+            allNotifications = data.notifications;
+            
+            console.log(`✅ Loaded ${allNotifications.length} notifications`);
+            
+            renderNotificationsList();
+        } catch (error) {
+            console.error('❌ Error loading notifications:', error);
+            document.getElementById('notifications-container').innerHTML = `
+                <div class="bg-white rounded-lg shadow-md p-12 text-center">
+                    <svg class="h-16 w-16 text-red-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <p class="text-gray-600 font-semibold mb-2">Failed to load notifications</p>
+                    <p class="text-sm text-gray-500">${error.message}</p>
+                    <button onclick="loadNotifications()" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                        Retry
+                    </button>
+                </div>
+            `;
+        }
+    }
+
+    // Render notifications based on filter
+    function renderNotificationsList() {
+        console.log('🎨 renderNotificationsList called, allNotifications:', allNotifications);
+        
+        // Safety check
+        if (!Array.isArray(allNotifications)) {
+            console.error('❌ allNotifications is not an array:', allNotifications);
+            allNotifications = [];
+        }
+        
+        console.log('🎨 After safety check, allNotifications length:', allNotifications.length);
+        
+        let filtered = allNotifications;
+
+        if (currentFilter === 'unread') {
+            filtered = allNotifications.filter(n => !n.is_read);
+        } else if (currentFilter === 'bids') {
+            filtered = allNotifications.filter(n => n.type === 'bid_submitted');
+        } else if (currentFilter === 'auctions') {
+            filtered = allNotifications.filter(n => ['new_auction', 'auction_deadline'].includes(n.type));
+        } else if (currentFilter === 'payments') {
+            filtered = allNotifications.filter(n => ['escrow_released'].includes(n.type));
+        }
+
+        const container = document.getElementById('notifications-container');
+
+        if (filtered.length === 0) {
+            container.innerHTML = `
+                <div class="bg-white rounded-lg shadow-md p-12 text-center">
+                    <svg class="h-16 w-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
+                    </svg>
+                    <h3 class="text-xl font-bold text-gray-900 mb-2">No notifications</h3>
+                    <p class="text-gray-600">You're all caught up!</p>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = filtered.map(notif => {
+            const isUnread = !notif.is_read;
+            const bgClass = isUnread ? 'bg-blue-50 border-l-4 border-blue-600' : 'bg-white';
+            const icon = getNotificationIcon(notif.type);
+            const timeAgo = formatTimeAgo(notif.created_at);
+
+            return `
+                <div class="notification-card ${bgClass} rounded-lg shadow-md hover:shadow-lg transition-all cursor-pointer" data-id="${notif.id}" data-link="${notif.link}">
+                    <div class="p-6 flex gap-4">
+                        <div class="flex-shrink-0">
+                            ${icon}
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-start justify-between mb-2">
+                                <h3 class="text-lg font-bold text-gray-900">${notif.title}</h3>
+                                ${isUnread ? '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-600 text-white">New</span>' : ''}
+                            </div>
+                            <p class="text-gray-700 mb-3">${notif.message}</p>
+                            <div class="flex items-center gap-4 text-sm text-gray-500">
+                                <span class="flex items-center gap-1">
+                                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                    ${timeAgo}
+                                </span>
+                                <span class="px-2 py-1 bg-gray-100 rounded text-xs font-semibold">${getTypeLabel(notif.type)}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        // Add click handlers
+        document.querySelectorAll('.notification-card').forEach(card => {
+            card.addEventListener('click', () => {
+                const notifId = card.getAttribute('data-id');
+                const notifLink = card.getAttribute('data-link');
+                markAsRead(notifId).then(() => {
+                    if (notifLink && notifLink !== 'null' && notifLink !== 'undefined') {
+                        window.location.href = notifLink;
+                    }
+                });
+            });
+        });
+    }
+
+    // Get notification icon
+    function getNotificationIcon(type) {
+        const icons = {
+            'bid_submitted': '<svg class="h-10 w-10 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
+            'sample_approved': '<svg class="h-10 w-10 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
+            'sample_rejected': '<svg class="h-10 w-10 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
+            'escrow_released': '<svg class="h-10 w-10 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
+            'auction_deadline': '<svg class="h-10 w-10 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
+            'contract_signoff': '<svg class="h-10 w-10 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>',
+            'new_rfq': '<svg class="h-10 w-10 text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>',
+            'new_auction': '<svg class="h-10 w-10 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>',
+            'chat_message': '<svg class="h-10 w-10 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>'
+        };
+        return icons[type] || '<svg class="h-10 w-10 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>';
+    }
+
+    // Get type label
+    function getTypeLabel(type) {
+        const labels = {
+            'bid_submitted': 'Bid',
+            'sample_approved': 'Sample',
+            'sample_rejected': 'Sample',
+            'escrow_released': 'Payment',
+            'auction_deadline': 'Auction',
+            'contract_signoff': 'Contract',
+            'new_rfq': 'RFQ',
+            'new_auction': 'Auction',
+            'chat_message': 'Chat'
+        };
+        return labels[type] || 'Notification';
+    }
+
+    // Format time ago
+    function formatTimeAgo(timestamp) {
+        const now = new Date();
+        const notifTime = new Date(timestamp);
+        const diffMs = now - notifTime;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
+        if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+        if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+        return notifTime.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    // Mark as read
+    async function markAsRead(notifId) {
+        try {
+            await fetch(`/api/notifications/${notifId}/read`, {
+                method: 'POST'
+            });
+            // Update local state
+            const notif = allNotifications.find(n => n.id === notifId);
+            if (notif) {
+                notif.is_read = true;
+                renderNotificationsList();
+            }
+        } catch (error) {
+            console.error('Error marking notification as read:', error);
+        }
+    }
+
+    // Mark all as read
+    document.getElementById('mark-all-read-page').addEventListener('click', async () => {
+        try {
+            await fetch('/api/notifications/mark-all-read', {
+                method: 'POST'
+            });
+            allNotifications.forEach(n => n.is_read = true);
+            renderNotificationsList();
+        } catch (error) {
+            console.error('Error marking all as read:', error);
+        }
+    });
+
+    // Filter tabs
+    document.querySelectorAll('.filter-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            // Update active state
+            document.querySelectorAll('.filter-tab').forEach(t => {
+                t.classList.remove('active', 'text-blue-600', 'border-b-2', 'border-blue-600');
+                t.classList.add('text-gray-600');
+            });
+            tab.classList.add('active', 'text-blue-600', 'border-b-2', 'border-blue-600');
+            tab.classList.remove('text-gray-600');
+
+            // Update filter and render
+            currentFilter = tab.getAttribute('data-filter');
+            renderNotificationsList();
+        });
+    });
+
+    // Initial load
+    loadNotifications();
+</script>
+{% endblock %}
