@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Settings - Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 min-h-screen">
+
+    <nav class="bg-slate-900 border-b border-slate-700 shadow-lg">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center gap-4">
+                    <a href="/admin/dashboard" class="bg-blue-600 p-2 rounded-lg hover:bg-blue-700 transition">
+                        <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                        </svg>
+                    </a>
+                    <div>
+                        <h1 class="text-xl font-bold text-white">AI Bid Advisor Settings</h1>
+                        <p class="text-xs text-slate-400">Control AI recommendation parameters</p>
+                    </div>
+                </div>
+                <button onclick="logout()" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-semibold transition">
+                    Logout
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+
+        <!-- Stats row -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-8" id="stats-row">
+            <div class="bg-white rounded-xl shadow-sm p-5 border border-slate-200">
+                <p class="text-xs font-semibold text-slate-500 mb-1">Total Recommendations</p>
+                <p class="text-3xl font-bold text-slate-900" id="stat-total">—</p>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm p-5 border border-slate-200">
+                <p class="text-xs font-semibold text-slate-500 mb-1">Avg Suggested Price</p>
+                <p class="text-3xl font-bold text-blue-600" id="stat-avg-price">—</p>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm p-5 border border-slate-200">
+                <p class="text-xs font-semibold text-slate-500 mb-1">High Confidence</p>
+                <p class="text-3xl font-bold text-green-600" id="stat-high-conf">—</p>
+            </div>
+        </div>
+
+        <!-- Settings card -->
+        <div class="bg-white rounded-2xl shadow-md overflow-hidden mb-8">
+            <div class="bg-gradient-to-r from-blue-600 to-indigo-600 px-8 py-5">
+                <h2 class="text-xl font-bold text-white">AI Parameters</h2>
+                <p class="text-blue-100 text-sm mt-1">These settings apply to all new bid recommendations.</p>
+            </div>
+
+            <div class="p-8 space-y-6">
+                <div id="settings-alert-success" class="hidden p-4 bg-green-50 border border-green-200 rounded-lg text-green-800 font-medium text-sm"></div>
+                <div id="settings-alert-error"   class="hidden p-4 bg-red-50   border border-red-200   rounded-lg text-red-800   font-medium text-sm"></div>
+
+                <!-- Min profit margin -->
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-2">
+                        Minimum Profit Margin (%)
+                    </label>
+                    <p class="text-xs text-gray-500 mb-3">
+                        Suppliers cannot receive a recommendation below this margin. Prevents unrealistic underbidding.
+                    </p>
+                    <div class="flex items-center gap-4">
+                        <input type="range" id="min-margin-slider" min="0" max="50" step="0.5"
+                               class="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600">
+                        <div class="flex items-center gap-1 w-24">
+                            <input type="number" id="min-margin-input" min="0" max="100" step="0.5"
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-center font-bold focus:ring-2 focus:ring-blue-500">
+                            <span class="text-gray-500 font-bold">%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Max market adjustment -->
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-2">
+                        Max Market Adjustment (%)
+                    </label>
+                    <p class="text-xs text-gray-500 mb-3">
+                        Caps how much the AI can adjust prices based on market data.
+                    </p>
+                    <div class="flex items-center gap-4">
+                        <input type="range" id="max-adj-slider" min="0" max="50" step="0.5"
+                               class="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-600">
+                        <div class="flex items-center gap-1 w-24">
+                            <input type="number" id="max-adj-input" min="0" max="100" step="0.5"
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-center font-bold focus:ring-2 focus:ring-purple-500">
+                            <span class="text-gray-500 font-bold">%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Underbid protection toggle -->
+                <div class="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-200">
+                    <div>
+                        <p class="font-bold text-gray-800 text-sm">Underbid Protection</p>
+                        <p class="text-xs text-gray-500 mt-0.5">
+                            When enabled, AI will never recommend a price below base cost + minimum margin.
+                        </p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer ml-4 flex-shrink-0">
+                        <input type="checkbox" id="underbid-toggle" class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                </div>
+
+                <button id="save-settings-btn"
+                        class="px-8 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition disabled:opacity-50">
+                    Save Settings
+                </button>
+            </div>
+        </div>
+
+        <!-- Recent recommendations table -->
+        <div class="bg-white rounded-2xl shadow-md overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+                <h3 class="font-bold text-slate-900">Recent Recommendations</h3>
+                <span class="text-xs text-slate-400" id="rec-count"></span>
+            </div>
+            <div id="rec-loading" class="p-8 text-center text-slate-400 text-sm">Loading…</div>
+            <div id="rec-empty"   class="hidden p-8 text-center text-slate-400 text-sm">No recommendations yet.</div>
+            <div id="rec-table-wrap" class="hidden overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-slate-50 border-b border-slate-200">
+                        <tr>
+                            <th class="px-5 py-3 text-left text-xs font-bold text-slate-600 uppercase">Supplier</th>
+                            <th class="px-5 py-3 text-right text-xs font-bold text-slate-600 uppercase">Base Cost</th>
+                            <th class="px-5 py-3 text-right text-xs font-bold text-slate-600 uppercase">Suggested</th>
+                            <th class="px-5 py-3 text-right text-xs font-bold text-slate-600 uppercase">Margin</th>
+                            <th class="px-5 py-3 text-left text-xs font-bold text-slate-600 uppercase">Confidence</th>
+                            <th class="px-5 py-3 text-left text-xs font-bold text-slate-600 uppercase">Date</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rec-tbody" class="divide-y divide-slate-100"></tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // ===== Sync sliders with inputs =====
+        function syncSlider(sliderId, inputId) {
+            const slider = document.getElementById(sliderId);
+            const input  = document.getElementById(inputId);
+            slider.addEventListener('input', () => { input.value = slider.value; });
+            input.addEventListener('input', () => { slider.value = input.value; });
+        }
+        syncSlider('min-margin-slider', 'min-margin-input');
+        syncSlider('max-adj-slider',    'max-adj-input');
+
+        // ===== Load current settings =====
+        async function loadSettings() {
+            try {
+                const res  = await fetch('/api/admin/ai-settings');
+                const data = await res.json();
+                if (!data.success) return;
+                const s = data.settings;
+                document.getElementById('min-margin-input').value  = s.min_profit_margin_pct  ?? 10;
+                document.getElementById('min-margin-slider').value = s.min_profit_margin_pct  ?? 10;
+                document.getElementById('max-adj-input').value     = s.max_market_adjustment_pct ?? 25;
+                document.getElementById('max-adj-slider').value    = s.max_market_adjustment_pct ?? 25;
+                document.getElementById('underbid-toggle').checked = s.underbid_protection !== false;
+            } catch (e) { /* ignore */ }
+        }
+
+        // ===== Save settings =====
+        document.getElementById('save-settings-btn').addEventListener('click', async () => {
+            const btn     = document.getElementById('save-settings-btn');
+            const okEl    = document.getElementById('settings-alert-success');
+            const errEl   = document.getElementById('settings-alert-error');
+            okEl.classList.add('hidden');
+            errEl.classList.add('hidden');
+
+            btn.disabled = true;
+            btn.textContent = 'Saving…';
+
+            try {
+                const res  = await fetch('/api/admin/ai-settings', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        min_profit_margin_pct:      parseFloat(document.getElementById('min-margin-input').value),
+                        max_market_adjustment_pct:  parseFloat(document.getElementById('max-adj-input').value),
+                        underbid_protection:        document.getElementById('underbid-toggle').checked,
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    okEl.textContent = '✅ Settings saved successfully.';
+                    okEl.classList.remove('hidden');
+                } else {
+                    const msg = data.error || (data.errors ? Object.values(data.errors).join(', ') : 'Failed to save');
+                    errEl.textContent = '❌ ' + msg;
+                    errEl.classList.remove('hidden');
+                }
+            } catch (e) {
+                errEl.textContent = '❌ Network error.';
+                errEl.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Save Settings';
+            }
+        });
+
+        // ===== Load recent recommendations =====
+        async function loadRecentRecs() {
+            try {
+                // Fetch all companies, then get history for each supplier
+                const compRes  = await fetch('/api/admin/companies');
+                const compData = await compRes.json();
+                const companies = (compData.companies || []).filter(c => c.role === 'SUPPLIER');
+
+                let allRecs = [];
+                for (const c of companies) {
+                    const r = await fetch(`/ai/history/${c.id}`);
+                    const d = await r.json();
+                    if (d.success && d.history) allRecs.push(...d.history);
+                }
+
+                // Deduplicate & sort
+                const seen = new Set();
+                allRecs = allRecs.filter(r => { if (seen.has(r.id)) return false; seen.add(r.id); return true; });
+                allRecs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+                // Stats
+                const total    = allRecs.length;
+                const avgPrice = total > 0 ? (allRecs.reduce((s, r) => s + r.suggested_price, 0) / total).toFixed(2) : '—';
+                const highConf = allRecs.filter(r => r.confidence_label === 'High').length;
+                document.getElementById('stat-total').textContent     = total;
+                document.getElementById('stat-avg-price').textContent = total > 0 ? '$' + avgPrice : '—';
+                document.getElementById('stat-high-conf').textContent = highConf;
+                document.getElementById('rec-count').textContent      = `${total} total`;
+
+                document.getElementById('rec-loading').classList.add('hidden');
+
+                if (total === 0) {
+                    document.getElementById('rec-empty').classList.remove('hidden');
+                    return;
+                }
+
+                document.getElementById('rec-table-wrap').classList.remove('hidden');
+                const tbody = document.getElementById('rec-tbody');
+                tbody.innerHTML = '';
+
+                allRecs.slice(0, 50).forEach(r => {
+                    const date = r.created_at
+                        ? new Date(r.created_at).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'})
+                        : '—';
+                    const confColor = r.confidence_label === 'High'
+                        ? 'text-green-600 bg-green-50' : r.confidence_label === 'Medium'
+                        ? 'text-blue-600 bg-blue-50' : 'text-orange-600 bg-orange-50';
+
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-slate-50 transition-colors';
+                    tr.innerHTML = `
+                        <td class="px-5 py-3 font-semibold text-slate-800">${escHtml(r.supplier_name || '—')}</td>
+                        <td class="px-5 py-3 text-right font-mono text-slate-600">$${r.base_cost.toFixed(4)}</td>
+                        <td class="px-5 py-3 text-right font-bold text-green-700">$${r.suggested_price.toFixed(2)}</td>
+                        <td class="px-5 py-3 text-right text-blue-600 font-semibold">${r.profit_margin_pct}%</td>
+                        <td class="px-5 py-3">
+                            <span class="px-2 py-0.5 rounded-full text-xs font-bold ${confColor}">${r.confidence_label}</span>
+                        </td>
+                        <td class="px-5 py-3 text-xs text-slate-400">${date}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+            } catch (e) {
+                document.getElementById('rec-loading').textContent = 'Failed to load recommendations.';
+            }
+        }
+
+        function escHtml(s) {
+            return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        }
+
+        async function logout() {
+            await fetch('/logout');
+            window.location.href = '/admin/login';
+        }
+
+        // Init
+        loadSettings();
+        loadRecentRecs();
+    </script>
+</body>
+</html>

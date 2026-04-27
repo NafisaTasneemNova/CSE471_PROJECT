@@ -168,3 +168,84 @@ class NotificationModel(BaseModel):
     is_read: bool = Field(default=False, description="Whether notification has been read")
     created_at: datetime = Field(default_factory=datetime.utcnow, description="When notification was created")
     related_id: Optional[str] = Field(None, description="Related entity ID (RFQ, bid, etc.)")
+
+
+class RatingModel(BaseModel):
+    """Model for mutual buyer-supplier ratings after order completion."""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="Unique rating ID")
+    reviewer_id: str = Field(..., description="User ID of the person giving the rating")
+    reviewer_company_id: str = Field(..., description="Company ID of the reviewer")
+    reviewer_name: str = Field(..., description="Company name of the reviewer (for display)")
+    reviewed_user_id: str = Field(..., description="User ID of the person being rated")
+    reviewed_company_id: str = Field(..., description="Company ID of the company being rated")
+    reviewed_company_name: str = Field(..., description="Company name being rated (for display)")
+    order_id: str = Field(..., description="RFQ/Order ID this rating is tied to (prevents duplicate ratings)")
+    rating: int = Field(..., ge=1, le=5, description="Numeric rating from 1 to 5")
+    review_text: Optional[str] = Field(None, max_length=1000, description="Optional written review")
+    created_at: datetime = Field(default_factory=datetime.utcnow, description="When the rating was submitted")
+
+
+class MilestoneStatusEnum(str, Enum):
+    PENDING = "pending"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+
+
+class MilestoneStageModel(BaseModel):
+    name: str = Field(..., description="Stage name e.g. Order Placed, Fabric Sourcing")
+    status: MilestoneStatusEnum = Field(default=MilestoneStatusEnum.PENDING)
+    timestamp: Optional[datetime] = Field(None, description="When this stage was last updated")
+    note: Optional[str] = Field(None, max_length=300, description="Optional supplier note for this stage")
+
+
+class OrderMilestoneModel(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="Unique milestone doc ID")
+    order_id: str = Field(..., description="RFQ/Order ID this milestone belongs to")
+    current_stage: str = Field(default="Order Placed", description="Name of the currently active stage")
+    stages: List[MilestoneStageModel] = Field(default_factory=list, description="Ordered list of all stages with status")
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class SupplierCapacityModel(BaseModel):
+    """Tracks a supplier's monthly production capacity and availability."""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="Unique capacity record ID")
+    supplier_id: str = Field(..., description="Company ID of the supplier")
+    supplier_name: str = Field(..., description="Company name (for display)")
+    total_capacity: int = Field(..., gt=0, description="Total monthly production capacity in units")
+    available_capacity: int = Field(..., ge=0, description="Currently available units this month")
+    reserved_capacity: int = Field(default=0, ge=0, description="Units reserved by confirmed orders")
+    unit: str = Field(default="units/month", description="Capacity unit label")
+    last_updated: datetime = Field(default_factory=datetime.utcnow, description="When capacity was last updated")
+    updated_by: Optional[str] = Field(None, description="User ID who last updated this record")
+
+
+class BidRecommendationModel(BaseModel):
+    """Stores AI-generated bid recommendation results for a supplier."""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="Unique recommendation ID")
+    supplier_id: str = Field(..., description="Company ID of the supplier")
+    supplier_name: str = Field(..., description="Company name (for display)")
+    rfq_id: Optional[str] = Field(None, description="RFQ this recommendation was generated for")
+    # Input costs
+    input_costs: dict = Field(..., description="Raw cost inputs: material, labor, shipping, quantity")
+    # AI output
+    base_cost: float = Field(..., description="Sum of all input costs per unit")
+    suggested_price: float = Field(..., description="Recommended optimal bid price per unit")
+    price_range_min: float = Field(..., description="Lower bound of suggested price range")
+    price_range_max: float = Field(..., description="Upper bound of suggested price range")
+    profit_margin_pct: float = Field(..., description="Applied profit margin percentage")
+    market_adjustment: float = Field(..., description="Market-based price adjustment applied")
+    confidence_score: float = Field(..., ge=0, le=1, description="AI confidence score 0.0–1.0")
+    confidence_label: str = Field(..., description="Human-readable confidence: Low / Medium / High")
+    reasoning: List[str] = Field(default_factory=list, description="Bullet-point reasoning for the recommendation")
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class AISettingsModel(BaseModel):
+    """Platform-wide AI settings controlled by admin."""
+    id: str = Field(default="ai_settings", description="Singleton document ID")
+    min_profit_margin_pct: float = Field(default=10.0, ge=0, le=100, description="Minimum allowed profit margin %")
+    max_market_adjustment_pct: float = Field(default=25.0, ge=0, le=100, description="Max market adjustment % allowed")
+    underbid_protection: bool = Field(default=True, description="Prevent bids below base cost + min margin")
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_by: Optional[str] = Field(None, description="Admin user ID who last changed settings")

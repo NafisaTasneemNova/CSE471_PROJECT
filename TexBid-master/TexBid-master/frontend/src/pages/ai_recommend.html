@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Bid Advisor - TexBid</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        @keyframes shimmer {
+            0%   { background-position: -400px 0; }
+            100% { background-position: 400px 0; }
+        }
+        .shimmer {
+            background: linear-gradient(90deg, #f0f4ff 25%, #dbeafe 50%, #f0f4ff 75%);
+            background-size: 400px 100%;
+            animation: shimmer 1.4s infinite;
+        }
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(16px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .fade-up { animation: fadeUp 0.4s ease forwards; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
+    {% include 'base.html' %}
+
+    <div class="max-w-4xl mx-auto px-4 py-10">
+
+        <!-- Page header -->
+        <div class="mb-8 flex items-start gap-4">
+            {% if rfq %}
+            <a href="/rfq/{{ rfq.id }}"
+               class="mt-1 text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center gap-1">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                </svg>
+                Back to RFQ
+            </a>
+            {% endif %}
+            <div>
+                <div class="flex items-center gap-3 mb-1">
+                    <div class="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                        </svg>
+                    </div>
+                    <h1 class="text-3xl font-bold text-gray-900">AI Bid Advisor</h1>
+                </div>
+                <p class="text-gray-500 text-sm">
+                    Enter your costs and get a data-driven bid recommendation
+                    {% if rfq %} for <span class="font-semibold text-blue-600">{{ rfq.title }}</span>{% endif %}.
+                </p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+
+            <!-- ===== INPUT FORM (left, 2/5) ===== -->
+            <div class="lg:col-span-2">
+                <div class="bg-white rounded-2xl shadow-md overflow-hidden sticky top-6">
+                    <div class="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
+                        <h2 class="text-white font-bold text-lg">Cost Inputs</h2>
+                        <p class="text-blue-100 text-xs mt-0.5">Per unit unless noted</p>
+                    </div>
+                    <div class="p-6 space-y-4">
+
+                        <input type="hidden" id="rfq_id" value="{{ rfq_id }}">
+
+                        <!-- Material cost -->
+                        <div>
+                            <label class="block text-xs font-bold text-gray-600 uppercase mb-1.5">
+                                Material Cost / unit <span class="text-red-500">*</span>
+                            </label>
+                            <div class="relative">
+                                <span class="absolute left-3 top-2.5 text-gray-500 font-bold">$</span>
+                                <input type="number" id="material_cost" step="0.01" min="0" placeholder="0.00"
+                                       class="w-full pl-7 pr-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                        </div>
+
+                        <!-- Labor cost -->
+                        <div>
+                            <label class="block text-xs font-bold text-gray-600 uppercase mb-1.5">
+                                Labor Cost / unit <span class="text-red-500">*</span>
+                            </label>
+                            <div class="relative">
+                                <span class="absolute left-3 top-2.5 text-gray-500 font-bold">$</span>
+                                <input type="number" id="labor_cost" step="0.01" min="0" placeholder="0.00"
+                                       class="w-full pl-7 pr-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                        </div>
+
+                        <!-- Shipping cost (total) -->
+                        <div>
+                            <label class="block text-xs font-bold text-gray-600 uppercase mb-1.5">
+                                Total Shipping Cost <span class="text-red-500">*</span>
+                            </label>
+                            <div class="relative">
+                                <span class="absolute left-3 top-2.5 text-gray-500 font-bold">$</span>
+                                <input type="number" id="shipping_cost" step="0.01" min="0" placeholder="0.00"
+                                       class="w-full pl-7 pr-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                            <p class="text-xs text-gray-400 mt-1">Spread across all units automatically</p>
+                        </div>
+
+                        <!-- Quantity -->
+                        <div>
+                            <label class="block text-xs font-bold text-gray-600 uppercase mb-1.5">
+                                Order Quantity
+                                {% if rfq %}<span class="text-blue-500 font-normal normal-case">(pre-filled)</span>{% endif %}
+                            </label>
+                            <input type="number" id="quantity" min="1" placeholder="e.g. 5000"
+                                   value="{{ rfq.quantity if rfq else '' }}"
+                                   class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+
+                        <!-- Error display -->
+                        <div id="form-error" class="hidden p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-xs font-medium"></div>
+
+                        <!-- Submit -->
+                        <button id="get-recommendation-btn"
+                                class="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 text-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                            </svg>
+                            Get AI Recommendation
+                        </button>
+
+                        <!-- Use recommended price button (shown after result) -->
+                        <button id="use-price-btn"
+                                class="hidden w-full py-2.5 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition-colors text-sm">
+                            ✅ Use This Price in Bid
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== RESULT PANEL (right, 3/5) ===== -->
+            <div class="lg:col-span-3 space-y-5">
+
+                <!-- Loading skeleton -->
+                <div id="loading-skeleton" class="hidden space-y-4">
+                    <div class="bg-white rounded-2xl shadow-md p-6 space-y-4">
+                        <div class="shimmer h-6 w-48 rounded-lg"></div>
+                        <div class="shimmer h-16 w-full rounded-xl"></div>
+                        <div class="shimmer h-4 w-3/4 rounded"></div>
+                        <div class="shimmer h-4 w-1/2 rounded"></div>
+                    </div>
+                </div>
+
+                <!-- Empty state -->
+                <div id="empty-state" class="bg-white rounded-2xl shadow-md p-10 text-center">
+                    <div class="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                  d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-bold text-gray-700 mb-2">Ready to Analyse</h3>
+                    <p class="text-gray-400 text-sm">Enter your costs on the left and click<br><strong>Get AI Recommendation</strong>.</p>
+                </div>
+
+                <!-- Result card (hidden until response) -->
+                <div id="result-card" class="hidden fade-up space-y-5">
+
+                    <!-- Main price card -->
+                    <div class="bg-white rounded-2xl shadow-md overflow-hidden">
+                        <div class="bg-gradient-to-r from-green-500 to-emerald-600 px-6 py-5">
+                            <p class="text-green-100 text-xs font-semibold uppercase tracking-widest mb-1">Recommended Bid Price</p>
+                            <div class="flex items-end gap-3">
+                                <span class="text-5xl font-extrabold text-white" id="res-suggested">$—</span>
+                                <span class="text-green-200 text-sm mb-1">per unit</span>
+                            </div>
+                            <p class="text-green-100 text-sm mt-2">
+                                Range: <span class="font-bold text-white" id="res-range">$— – $—</span>
+                            </p>
+                        </div>
+
+                        <div class="p-6 grid grid-cols-3 gap-4">
+                            <!-- Base cost -->
+                            <div class="text-center">
+                                <p class="text-xs font-bold text-gray-500 uppercase mb-1">Base Cost</p>
+                                <p class="text-xl font-extrabold text-gray-900" id="res-base">$—</p>
+                            </div>
+                            <!-- Margin -->
+                            <div class="text-center">
+                                <p class="text-xs font-bold text-gray-500 uppercase mb-1">Margin</p>
+                                <p class="text-xl font-extrabold text-blue-600" id="res-margin">—%</p>
+                            </div>
+                            <!-- Market adj -->
+                            <div class="text-center">
+                                <p class="text-xs font-bold text-gray-500 uppercase mb-1">Market Adj.</p>
+                                <p class="text-xl font-extrabold text-purple-600" id="res-adj">$—</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Confidence indicator -->
+                    <div class="bg-white rounded-2xl shadow-md p-5">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="font-bold text-gray-800 text-sm">AI Confidence</h3>
+                            <span id="res-confidence-label"
+                                  class="px-3 py-1 rounded-full text-xs font-bold border">—</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-3">
+                            <div id="res-confidence-bar"
+                                 class="h-3 rounded-full transition-all duration-700 bg-blue-500"
+                                 style="width: 0%"></div>
+                        </div>
+                        <p class="text-xs text-gray-400 mt-2" id="res-confidence-pct">—</p>
+                    </div>
+
+                    <!-- Reasoning -->
+                    <div class="bg-white rounded-2xl shadow-md p-5">
+                        <h3 class="font-bold text-gray-800 text-sm mb-3 flex items-center gap-2">
+                            <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            How We Got Here
+                        </h3>
+                        <ul id="res-reasoning" class="space-y-2 text-sm text-gray-600"></ul>
+                    </div>
+
+                    <!-- History link -->
+                    <div class="text-center">
+                        <a href="#history-section" id="view-history-link"
+                           class="text-blue-600 hover:text-blue-800 text-sm font-semibold">
+                            View past recommendations ↓
+                        </a>
+                    </div>
+                </div>
+
+                <!-- ===== HISTORY SECTION ===== -->
+                <div id="history-section" class="bg-white rounded-2xl shadow-md overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                        <h3 class="font-bold text-gray-800">Past Recommendations</h3>
+                        <span class="text-xs text-gray-400" id="history-count"></span>
+                    </div>
+                    <div id="history-list" class="divide-y divide-gray-100">
+                        <p class="text-sm text-gray-400 text-center py-8" id="history-empty">Loading history…</p>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const COMPANY_ID = "{{ company.get('id') if company else '' }}";
+        const RFQ_ID     = document.getElementById('rfq_id').value;
+        let lastSuggestedPrice = null;
+
+        // ===== GET RECOMMENDATION =====
+        document.getElementById('get-recommendation-btn').addEventListener('click', async () => {
+            const material = parseFloat(document.getElementById('material_cost').value);
+            const labor    = parseFloat(document.getElementById('labor_cost').value);
+            const shipping = parseFloat(document.getElementById('shipping_cost').value);
+            const quantity = parseInt(document.getElementById('quantity').value) || 1;
+            const errEl    = document.getElementById('form-error');
+
+            errEl.classList.add('hidden');
+
+            // Client-side validation
+            const errs = [];
+            if (isNaN(material) || material < 0) errs.push('Material cost is required and must be ≥ 0.');
+            if (isNaN(labor)    || labor    < 0) errs.push('Labor cost is required and must be ≥ 0.');
+            if (isNaN(shipping) || shipping < 0) errs.push('Shipping cost is required and must be ≥ 0.');
+            if (errs.length) {
+                errEl.innerHTML = errs.join('<br>');
+                errEl.classList.remove('hidden');
+                return;
+            }
+
+            // Show skeleton, hide others
+            document.getElementById('empty-state').classList.add('hidden');
+            document.getElementById('result-card').classList.add('hidden');
+            document.getElementById('loading-skeleton').classList.remove('hidden');
+
+            const btn = document.getElementById('get-recommendation-btn');
+            btn.disabled = true;
+            btn.innerHTML = `<svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+            </svg> Analysing…`;
+
+            try {
+                const res  = await fetch('/ai/recommend-bid', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        material_cost: material,
+                        labor_cost:    labor,
+                        shipping_cost: shipping,
+                        quantity:      quantity,
+                        rfq_id:        RFQ_ID || null,
+                    })
+                });
+                const data = await res.json();
+
+                document.getElementById('loading-skeleton').classList.add('hidden');
+
+                if (!data.success) {
+                    const msg = data.error || (data.errors ? Object.values(data.errors).join(', ') : 'Failed to get recommendation');
+                    errEl.textContent = '❌ ' + msg;
+                    errEl.classList.remove('hidden');
+                    document.getElementById('empty-state').classList.remove('hidden');
+                    return;
+                }
+
+                renderResult(data);
+                await loadHistory();
+
+            } catch (e) {
+                document.getElementById('loading-skeleton').classList.add('hidden');
+                document.getElementById('empty-state').classList.remove('hidden');
+                errEl.textContent = '❌ Network error. Please try again.';
+                errEl.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                </svg> Get AI Recommendation`;
+            }
+        });
+
+        function renderResult(data) {
+            lastSuggestedPrice = data.suggested_price;
+
+            document.getElementById('res-suggested').textContent = '$' + data.suggested_price.toFixed(2);
+            document.getElementById('res-range').textContent     = `$${data.price_range_min.toFixed(2)} – $${data.price_range_max.toFixed(2)}`;
+            document.getElementById('res-base').textContent      = '$' + data.base_cost.toFixed(4);
+            document.getElementById('res-margin').textContent    = data.profit_margin_pct.toFixed(1) + '%';
+
+            const adj = data.market_adjustment;
+            const adjEl = document.getElementById('res-adj');
+            adjEl.textContent = (adj >= 0 ? '+$' : '-$') + Math.abs(adj).toFixed(4);
+            adjEl.className   = 'text-xl font-extrabold ' + (adj >= 0 ? 'text-purple-600' : 'text-orange-500');
+
+            // Confidence
+            const conf     = data.confidence_score;
+            const confPct  = Math.round(conf * 100);
+            const confLabel= data.confidence_label;
+            const confBar  = document.getElementById('res-confidence-bar');
+            const confLbl  = document.getElementById('res-confidence-label');
+            const confPctEl= document.getElementById('res-confidence-pct');
+
+            confBar.style.width = confPct + '%';
+            confPctEl.textContent = `${confPct}% confidence based on historical market data`;
+
+            if (confLabel === 'High') {
+                confBar.className = 'h-3 rounded-full transition-all duration-700 bg-green-500';
+                confLbl.className = 'px-3 py-1 rounded-full text-xs font-bold border bg-green-100 text-green-700 border-green-200';
+            } else if (confLabel === 'Medium') {
+                confBar.className = 'h-3 rounded-full transition-all duration-700 bg-blue-500';
+                confLbl.className = 'px-3 py-1 rounded-full text-xs font-bold border bg-blue-100 text-blue-700 border-blue-200';
+            } else {
+                confBar.className = 'h-3 rounded-full transition-all duration-700 bg-orange-400';
+                confLbl.className = 'px-3 py-1 rounded-full text-xs font-bold border bg-orange-100 text-orange-700 border-orange-200';
+            }
+            confLbl.textContent = confLabel + ' Confidence';
+
+            // Reasoning
+            const ul = document.getElementById('res-reasoning');
+            ul.innerHTML = '';
+            (data.reasoning || []).forEach(r => {
+                const li = document.createElement('li');
+                li.className = 'flex items-start gap-2';
+                li.innerHTML = `<span class="text-blue-400 mt-0.5 flex-shrink-0">•</span><span>${escHtml(r)}</span>`;
+                ul.appendChild(li);
+            });
+
+            // Show result, show "use price" button if on auction page context
+            document.getElementById('result-card').classList.remove('hidden');
+            if (RFQ_ID) {
+                document.getElementById('use-price-btn').classList.remove('hidden');
+            }
+        }
+
+        // ===== USE PRICE BUTTON =====
+        document.getElementById('use-price-btn').addEventListener('click', () => {
+            if (!lastSuggestedPrice || !RFQ_ID) return;
+            // Navigate to auction room with price pre-filled via URL param
+            window.location.href = `/auction/${RFQ_ID}?suggested_price=${lastSuggestedPrice}`;
+        });
+
+        // ===== HISTORY =====
+        async function loadHistory() {
+            if (!COMPANY_ID) return;
+            const listEl  = document.getElementById('history-list');
+            const emptyEl = document.getElementById('history-empty');
+            const countEl = document.getElementById('history-count');
+
+            try {
+                const res  = await fetch(`/ai/history/${COMPANY_ID}`);
+                const data = await res.json();
+
+                if (!data.success || !data.history || data.history.length === 0) {
+                    emptyEl.textContent = 'No past recommendations yet.';
+                    return;
+                }
+
+                emptyEl.remove();
+                countEl.textContent = `${data.total} saved`;
+                listEl.innerHTML = '';
+
+                data.history.forEach(r => {
+                    const date = r.created_at
+                        ? new Date(r.created_at).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'})
+                        : '—';
+                    const confColor = r.confidence_label === 'High'
+                        ? 'text-green-600' : r.confidence_label === 'Medium'
+                        ? 'text-blue-600' : 'text-orange-500';
+
+                    const div = document.createElement('div');
+                    div.className = 'px-6 py-4 hover:bg-slate-50 transition-colors';
+                    div.innerHTML = `
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <span class="text-lg font-extrabold text-gray-900">$${r.suggested_price.toFixed(2)}</span>
+                                <span class="text-xs text-gray-400 ml-2">$${r.price_range_min.toFixed(2)}–$${r.price_range_max.toFixed(2)}</span>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-xs font-bold ${confColor}">${r.confidence_label}</span>
+                                <p class="text-xs text-gray-400">${date}</p>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">
+                            Base: $${r.base_cost.toFixed(4)} &bull; Margin: ${r.profit_margin_pct}%
+                            ${r.rfq_id ? `&bull; <a href="/rfq/${r.rfq_id}" class="text-blue-500 hover:underline">View RFQ</a>` : ''}
+                        </p>
+                    `;
+                    listEl.appendChild(div);
+                });
+
+            } catch (e) {
+                emptyEl.textContent = 'Could not load history.';
+            }
+        }
+
+        function escHtml(s) {
+            return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        }
+
+        // Init
+        loadHistory();
+    </script>
+</body>
+</html>

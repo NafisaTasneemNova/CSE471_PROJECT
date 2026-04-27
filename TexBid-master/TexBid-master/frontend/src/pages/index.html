@@ -48,10 +48,17 @@
             RFQs, real-time reverse auctions, and secure escrow.
         </p>
         <div class="flex flex-col sm:flex-row justify-center gap-5 animate-fade-in-up delay-500">
+            {% if user %}
             <a href="/rfq/create"
                 class="inline-flex items-center justify-center px-8 py-4 border border-transparent text-lg font-bold rounded-xl text-white bg-brand-accent hover:bg-emerald-500 shadow-xl shadow-emerald-500/30 transition-all hover:-translate-y-1 hover:shadow-emerald-500/50">
                 Post an RFQ Now
             </a>
+            {% else %}
+            <button type="button" onclick="showLoginToast()"
+                class="inline-flex items-center justify-center px-8 py-4 border border-transparent text-lg font-bold rounded-xl text-white bg-brand-accent hover:bg-emerald-500 shadow-xl shadow-emerald-500/30 transition-all hover:-translate-y-1 hover:shadow-emerald-500/50">
+                Post an RFQ Now
+            </button>
+            {% endif %}
             <a href="/verify/supplier"
                 class="inline-flex items-center justify-center px-8 py-4 border-2 border-slate-600 text-lg font-bold rounded-xl text-white bg-transparent hover:bg-white/5 transition-all hover:-translate-y-1 backdrop-blur-sm">
                 Join as Supplier
@@ -78,8 +85,45 @@
                 Real-Time Tracking
             </div>
         </div>
+    </div><!-- end relative z-10 -->
+</section><!-- end hero section -->
+
+<!-- Login Required Toast — outside overflow-hidden section so it renders correctly -->
+<div id="login-toast"
+     style="display:none; position:fixed; top:24px; left:50%; transform:translateX(-50%); z-index:9999; width:420px; max-width:calc(100vw - 32px);"
+     class="bg-white rounded-2xl shadow-2xl border border-blue-200 px-5 py-4">
+    <div class="flex items-center gap-3">
+        <div class="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+            </svg>
+        </div>
+        <div class="flex-1">
+            <p class="font-bold text-gray-900 text-sm">Login Required</p>
+            <p class="text-gray-500 text-xs mt-0.5">You must login before posting an RFQ.</p>
+        </div>
+        <a href="/login?next=/rfq/create"
+           class="flex-shrink-0 px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 transition">
+            Log In
+        </a>
+        <button type="button" onclick="hideLoginToast()" class="flex-shrink-0 text-gray-400 hover:text-gray-600 ml-1">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+        </button>
     </div>
-</section>
+</div>
+<script>
+    function showLoginToast() {
+        document.getElementById('login-toast').style.display = 'block';
+        clearTimeout(window._toastTimer);
+        window._toastTimer = setTimeout(hideLoginToast, 5000);
+    }
+    function hideLoginToast() {
+        document.getElementById('login-toast').style.display = 'none';
+    }
+</script>
 
 <!-- Dashboard Mockup/Visual -->
 <section

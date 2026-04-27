@@ -127,24 +127,27 @@
                 {% endif %}
             </div>
 
-            <!-- Factory Capacity Card -->
+            <!-- Factory Capacity Card — live data -->
             <div class="stat-card bg-white rounded-xl border border-[#E5E7EB] p-5 animate-fade-in-up delay-200">
                 <div class="flex items-center gap-2 mb-4">
                     <div class="w-8 h-8 rounded-lg bg-[#c29c69]/10 flex items-center justify-center">
-                        <svg class="w-4 h-4 text-[#c29c69]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+                        <svg class="w-4 h-4 text-[#c29c69]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                        </svg>
                     </div>
                     <h2 class="text-sm font-bold text-slate-800">Factory Capacity</h2>
                 </div>
+
                 {% if legal %}
-                <!-- Manufacturing Badge -->
+                <!-- Manufacturing type badge (static from legal record) -->
                 <div class="mb-4">
                     <span class="inline-flex items-center gap-1.5 bg-[#1b4478]/10 text-[#1b4478] text-xs font-bold px-3 py-1.5 rounded-full border border-[#1b4478]/20">
-                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
                         {{ legal.manufacturing_type | default('—') }}
                     </span>
                 </div>
-                <!-- Stat blocks -->
-                <div class="grid grid-cols-3 gap-3">
+                <!-- Static workforce stats -->
+                <div class="grid grid-cols-3 gap-3 mb-4">
                     <div class="bg-slate-50 rounded-lg p-3 text-center border border-[#E5E7EB]">
                         <p class="text-lg font-extrabold text-slate-800">{{ '{:,}'.format(legal.total_workers | default(0)) }}</p>
                         <p class="text-[10px] font-bold text-slate-400 uppercase mt-0.5">Workers</p>
@@ -158,9 +161,37 @@
                         <p class="text-[10px] font-bold text-slate-400 uppercase mt-0.5">Turnover</p>
                     </div>
                 </div>
-                {% else %}
-                <p class="text-sm text-slate-400 italic">No capacity data submitted.</p>
                 {% endif %}
+
+                <!-- Live capacity section (loaded via JS) -->
+                <div id="live-capacity-block">
+                    <p class="text-xs text-slate-400 text-center py-2">Loading capacity…</p>
+                </div>
+            </div>
+
+            <!-- Capacity Check Widget (for buyers) -->
+            <div id="capacity-check-card" class="hidden bg-white rounded-xl border border-[#E5E7EB] p-5 animate-fade-in-up delay-300">
+                <div class="flex items-center gap-2 mb-4">
+                    <div class="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                    <h2 class="text-sm font-bold text-slate-800">Check Order Feasibility</h2>
+                </div>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Your Order Quantity (units)</label>
+                        <input type="number" id="check-qty-input" min="1" placeholder="e.g. 5000"
+                               class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <button id="check-capacity-btn"
+                            class="w-full py-2 bg-blue-600 text-white text-sm font-bold rounded-lg hover:bg-blue-700 transition">
+                        Check Capacity
+                    </button>
+                    <!-- Result area -->
+                    <div id="capacity-check-result" class="hidden"></div>
+                </div>
             </div>
         </div>
 
@@ -236,4 +267,191 @@
 
     </div>
 </div>
+
+<script>
+// ===== FACTORY CAPACITY — supplier_detail.html =====
+const SUPPLIER_ID = "{{ company.id }}";
+
+async function loadLiveCapacity() {
+    const block = document.getElementById('live-capacity-block');
+    if (!block) return;
+
+    try {
+        const res  = await fetch(`/capacity/${SUPPLIER_ID}`);
+        const data = await res.json();
+
+        if (!data.success) {
+            block.innerHTML = '<p class="text-xs text-slate-400 italic">Capacity data unavailable.</p>';
+            return;
+        }
+
+        if (!data.has_capacity_data) {
+            block.innerHTML = '<p class="text-xs text-slate-400 italic">This supplier has not published their capacity yet.</p>';
+            return;
+        }
+
+        const cap   = data.capacity;
+        const total = cap.total_capacity || 0;
+        const avail = cap.available_capacity || 0;
+        const resv  = cap.reserved_capacity || 0;
+        const util  = data.utilization_pct || 0;
+
+        // Colour the bar based on utilisation
+        let barColor, badgeColor, badgeText;
+        if (util >= 90) {
+            barColor = 'bg-red-500';
+            badgeColor = 'bg-red-100 text-red-700 border-red-200';
+            badgeText = '⚠ Near Full';
+        } else if (util >= 60) {
+            barColor = 'bg-orange-400';
+            badgeColor = 'bg-orange-100 text-orange-700 border-orange-200';
+            badgeText = 'Moderate';
+        } else {
+            barColor = 'bg-emerald-500';
+            badgeColor = 'bg-emerald-100 text-emerald-700 border-emerald-200';
+            badgeText = 'Available';
+        }
+
+        const lastUpdated = cap.last_updated
+            ? new Date(cap.last_updated).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'})
+            : '—';
+
+        block.innerHTML = `
+            <div class="space-y-3">
+                <!-- Status badge -->
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-slate-500 uppercase">Monthly Capacity</span>
+                    <span class="text-xs font-bold px-2 py-0.5 rounded-full border ${badgeColor}">${badgeText}</span>
+                </div>
+
+                <!-- Progress bar -->
+                <div>
+                    <div class="flex justify-between text-xs text-slate-500 mb-1">
+                        <span>${avail.toLocaleString()} available</span>
+                        <span>${util}% used</span>
+                    </div>
+                    <div class="w-full bg-slate-200 rounded-full h-2.5">
+                        <div class="${barColor} h-2.5 rounded-full transition-all duration-700"
+                             style="width: ${Math.min(util, 100)}%"></div>
+                    </div>
+                </div>
+
+                <!-- Stats row -->
+                <div class="grid grid-cols-3 gap-2 text-center">
+                    <div class="bg-slate-50 rounded-lg p-2 border border-slate-100">
+                        <p class="text-sm font-extrabold text-slate-800">${total.toLocaleString()}</p>
+                        <p class="text-[10px] text-slate-400 uppercase font-bold">Total</p>
+                    </div>
+                    <div class="bg-emerald-50 rounded-lg p-2 border border-emerald-100">
+                        <p class="text-sm font-extrabold text-emerald-700">${avail.toLocaleString()}</p>
+                        <p class="text-[10px] text-emerald-500 uppercase font-bold">Free</p>
+                    </div>
+                    <div class="bg-orange-50 rounded-lg p-2 border border-orange-100">
+                        <p class="text-sm font-extrabold text-orange-700">${resv.toLocaleString()}</p>
+                        <p class="text-[10px] text-orange-400 uppercase font-bold">Reserved</p>
+                    </div>
+                </div>
+
+                <p class="text-[10px] text-slate-400 text-right">Updated ${lastUpdated}</p>
+            </div>
+        `;
+
+        // Show the capacity check widget for buyers
+        const checkCard = document.getElementById('capacity-check-card');
+        if (checkCard) checkCard.classList.remove('hidden');
+
+    } catch (e) {
+        const block = document.getElementById('live-capacity-block');
+        if (block) block.innerHTML = '<p class="text-xs text-red-400">Could not load capacity.</p>';
+    }
+}
+
+// ===== CAPACITY CHECK (buyer tool) =====
+const checkBtn = document.getElementById('check-capacity-btn');
+if (checkBtn) {
+    checkBtn.addEventListener('click', async () => {
+        const qty = parseInt(document.getElementById('check-qty-input').value);
+        const resultEl = document.getElementById('capacity-check-result');
+
+        if (!qty || qty <= 0) {
+            resultEl.innerHTML = '<p class="text-xs text-red-500">Please enter a valid quantity.</p>';
+            resultEl.classList.remove('hidden');
+            return;
+        }
+
+        checkBtn.disabled = true;
+        checkBtn.textContent = 'Checking…';
+
+        try {
+            const res  = await fetch('/capacity/check', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ supplier_id: SUPPLIER_ID, order_quantity: qty })
+            });
+            const data = await res.json();
+
+            if (!data.success) {
+                resultEl.innerHTML = `<p class="text-xs text-red-500">${data.error}</p>`;
+                resultEl.classList.remove('hidden');
+                return;
+            }
+
+            if (data.can_fulfil === null) {
+                // No capacity data
+                resultEl.innerHTML = `
+                    <div class="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <p class="text-xs font-bold text-yellow-700">⚠ ${data.warning}</p>
+                    </div>`;
+            } else if (data.can_fulfil) {
+                resultEl.innerHTML = `
+                    <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+                        <p class="text-xs font-bold text-emerald-700">✅ This supplier can fulfil your order of ${qty.toLocaleString()} units.</p>
+                        <p class="text-xs text-emerald-600 mt-1">Available: ${data.available_capacity.toLocaleString()} units</p>
+                    </div>`;
+            } else {
+                // Cannot fulfil — show warning + suggestions
+                let html = `
+                    <div class="p-3 bg-red-50 border border-red-200 rounded-lg mb-3">
+                        <p class="text-xs font-bold text-red-700">⚠ Capacity Exceeded</p>
+                        <p class="text-xs text-red-600 mt-1">
+                            Available: <strong>${data.available_capacity.toLocaleString()}</strong> units &nbsp;|&nbsp;
+                            Your order: <strong>${qty.toLocaleString()}</strong> units &nbsp;|&nbsp;
+                            Shortfall: <strong>${data.shortfall.toLocaleString()}</strong> units
+                        </p>
+                    </div>`;
+
+                if (data.suggestions && data.suggestions.length > 0) {
+                    html += `<p class="text-xs font-bold text-slate-600 mb-2">💡 Suggestions:</p>`;
+                    data.suggestions.forEach(s => {
+                        const bg = s.type === 'split' ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-200';
+                        html += `
+                            <div class="p-3 ${bg} border rounded-lg mb-2">
+                                <p class="text-xs font-bold text-slate-800">${s.title}</p>
+                                <p class="text-xs text-slate-600 mt-0.5">${s.description}</p>
+                                ${s.type === 'alternative_supplier' && s.supplier_id
+                                    ? `<a href="/suppliers/${s.supplier_id}" class="text-xs text-blue-600 font-semibold hover:underline mt-1 inline-block">View Supplier →</a>`
+                                    : ''}
+                            </div>`;
+                    });
+                }
+
+                resultEl.innerHTML = html;
+            }
+
+            resultEl.classList.remove('hidden');
+
+        } catch (e) {
+            resultEl.innerHTML = '<p class="text-xs text-red-500">Network error. Please try again.</p>';
+            resultEl.classList.remove('hidden');
+        } finally {
+            checkBtn.disabled = false;
+            checkBtn.textContent = 'Check Capacity';
+        }
+    });
+}
+
+// Init
+loadLiveCapacity();
+</script>
+
 {% endblock %}

@@ -44,6 +44,22 @@
             </div>
             {% endif %}
 
+            <!-- Login-required notice (shown when redirected from a protected page) -->
+            <div id="login-required-notice" class="hidden bg-blue-50 border-2 border-blue-200 rounded-lg p-4 mb-6 flex items-start gap-3">
+                <svg class="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <p class="text-blue-800 font-semibold text-sm">You need to log in before posting an RFQ.</p>
+            </div>
+            <script>
+                // Show notice if redirected with ?msg=login_required
+                if (new URLSearchParams(window.location.search).get('msg') === 'login_required') {
+                    document.getElementById('login-required-notice').classList.remove('hidden');
+                    document.getElementById('login-required-notice').classList.add('flex');
+                }
+            </script>
+
             <form method="POST" action="/login" class="space-y-4">
                 <div>
                     <label class="block text-sm font-bold text-gray-900 mb-2">Email *</label>

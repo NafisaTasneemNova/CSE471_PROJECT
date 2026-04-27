@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Capacity Monitor - Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 min-h-screen">
+
+    <nav class="bg-slate-900 border-b border-slate-700 shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center gap-4">
+                    <a href="/admin/dashboard" class="bg-blue-600 p-2 rounded-lg hover:bg-blue-700 transition">
+                        <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                        </svg>
+                    </a>
+                    <div>
+                        <h1 class="text-xl font-bold text-white">Capacity Monitor</h1>
+                        <p class="text-xs text-slate-400">Supplier factory capacity overview</p>
+                    </div>
+                </div>
+                <button onclick="logout()" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-semibold transition">
+                    Logout
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+        <!-- Stats -->
+        <div class="grid grid-cols-1 sm:grid-cols-4 gap-5 mb-8">
+            <div class="bg-white rounded-xl shadow-sm p-5 border border-slate-200">
+                <p class="text-xs font-semibold text-slate-500 mb-1">Suppliers Tracked</p>
+                <p class="text-3xl font-bold text-slate-900" id="stat-total">—</p>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm p-5 border border-slate-200">
+                <p class="text-xs font-semibold text-slate-500 mb-1">Total Capacity</p>
+                <p class="text-3xl font-bold text-blue-600" id="stat-total-cap">—</p>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm p-5 border border-slate-200">
+                <p class="text-xs font-semibold text-slate-500 mb-1">Total Available</p>
+                <p class="text-3xl font-bold text-emerald-600" id="stat-avail">—</p>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm p-5 border border-slate-200">
+                <p class="text-xs font-semibold text-slate-500 mb-1">Near Full (&ge;90%)</p>
+                <p class="text-3xl font-bold text-red-500" id="stat-near-full">—</p>
+            </div>
+        </div>
+
+        <!-- Search -->
+        <div class="bg-white rounded-xl shadow-sm p-4 border border-slate-200 mb-6 flex gap-4">
+            <input type="text" id="search-input" placeholder="Search supplier name…"
+                   class="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500">
+            <select id="filter-status" class="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500">
+                <option value="">All</option>
+                <option value="high">Near Full (&ge;90%)</option>
+                <option value="medium">Moderate (60–89%)</option>
+                <option value="low">Available (&lt;60%)</option>
+            </select>
+            <button onclick="loadCapacities()" class="px-5 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 text-sm transition">
+                Refresh
+            </button>
+        </div>
+
+        <!-- Table -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+                <h2 class="text-lg font-bold text-slate-900">Supplier Capacities</h2>
+                <span class="text-sm text-slate-500" id="showing-count"></span>
+            </div>
+
+            <div id="loading-state" class="p-12 text-center text-slate-400">
+                <svg class="animate-spin h-8 w-8 mx-auto mb-3 text-blue-500" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                </svg>
+                Loading…
+            </div>
+            <div id="empty-state" class="hidden p-12 text-center text-slate-400">No capacity records found.</div>
+
+            <div id="table-wrap" class="hidden overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-slate-50 border-b border-slate-200">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase">Supplier</th>
+                            <th class="px-6 py-3 text-right text-xs font-bold text-slate-600 uppercase">Total</th>
+                            <th class="px-6 py-3 text-right text-xs font-bold text-slate-600 uppercase">Available</th>
+                            <th class="px-6 py-3 text-right text-xs font-bold text-slate-600 uppercase">Reserved</th>
+                            <th class="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase w-48">Utilisation</th>
+                            <th class="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase">Last Updated</th>
+                            <th class="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cap-tbody" class="divide-y divide-slate-100"></tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        let allRecords = [];
+
+        async function checkAdmin() {
+            try {
+                const res = await fetch('/api/admin/stats');
+                if (res.status === 401 || res.status === 403) { window.location.href = '/admin/login'; }
+            } catch (e) { window.location.href = '/admin/login'; }
+        }
+
+        async function loadCapacities() {
+            document.getElementById('loading-state').classList.remove('hidden');
+            document.getElementById('empty-state').classList.add('hidden');
+            document.getElementById('table-wrap').classList.add('hidden');
+
+            try {
+                const res  = await fetch('/api/admin/capacities');
+                const data = await res.json();
+
+                if (!data.success) throw new Error(data.error);
+
+                allRecords = data.capacities || [];
+                updateStats();
+                renderTable(allRecords);
+
+            } catch (e) {
+                document.getElementById('loading-state').classList.add('hidden');
+                document.getElementById('empty-state').textContent = 'Failed to load: ' + e.message;
+                document.getElementById('empty-state').classList.remove('hidden');
+            }
+        }
+
+        function updateStats() {
+            const total     = allRecords.length;
+            const totalCap  = allRecords.reduce((s, r) => s + (r.total_capacity || 0), 0);
+            const totalAvail= allRecords.reduce((s, r) => s + (r.available_capacity || 0), 0);
+            const nearFull  = allRecords.filter(r => (r.utilization_pct || 0) >= 90).length;
+
+            document.getElementById('stat-total').textContent     = total;
+            document.getElementById('stat-total-cap').textContent = totalCap.toLocaleString();
+            document.getElementById('stat-avail').textContent     = totalAvail.toLocaleString();
+            document.getElementById('stat-near-full').textContent = nearFull;
+        }
+
+        function renderTable(records) {
+            document.getElementById('loading-state').classList.add('hidden');
+
+            if (records.length === 0) {
+                document.getElementById('empty-state').classList.remove('hidden');
+                document.getElementById('table-wrap').classList.add('hidden');
+                document.getElementById('showing-count').textContent = '';
+                return;
+            }
+
+            document.getElementById('empty-state').classList.add('hidden');
+            document.getElementById('table-wrap').classList.remove('hidden');
+            document.getElementById('showing-count').textContent = `${records.length} supplier${records.length !== 1 ? 's' : ''}`;
+
+            const tbody = document.getElementById('cap-tbody');
+            tbody.innerHTML = '';
+
+            records.forEach(r => {
+                const util  = r.utilization_pct || 0;
+                const date  = r.last_updated
+                    ? new Date(r.last_updated).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'})
+                    : '—';
+
+                let barColor, badgeHtml;
+                if (util >= 90) {
+                    barColor  = 'bg-red-500';
+                    badgeHtml = '<span class="px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700 border border-red-200">⚠ Near Full</span>';
+                } else if (util >= 60) {
+                    barColor  = 'bg-orange-400';
+                    badgeHtml = '<span class="px-2 py-0.5 rounded-full text-xs font-bold bg-orange-100 text-orange-700 border border-orange-200">Moderate</span>';
+                } else {
+                    barColor  = 'bg-emerald-500';
+                    badgeHtml = '<span class="px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">Available</span>';
+                }
+
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50 transition-colors';
+                tr.innerHTML = `
+                    <td class="px-6 py-4 font-semibold text-slate-900">
+                        <a href="/suppliers/${r.supplier_id}" class="hover:text-blue-600 hover:underline">${escHtml(r.supplier_name || '—')}</a>
+                    </td>
+                    <td class="px-6 py-4 text-right font-mono text-slate-700">${(r.total_capacity||0).toLocaleString()}</td>
+                    <td class="px-6 py-4 text-right font-mono text-emerald-700 font-semibold">${(r.available_capacity||0).toLocaleString()}</td>
+                    <td class="px-6 py-4 text-right font-mono text-orange-600">${(r.reserved_capacity||0).toLocaleString()}</td>
+                    <td class="px-6 py-4">
+                        <div class="flex items-center gap-2">
+                            <div class="flex-1 bg-slate-200 rounded-full h-2">
+                                <div class="${barColor} h-2 rounded-full" style="width:${Math.min(util,100)}%"></div>
+                            </div>
+                            <span class="text-xs font-bold text-slate-600 w-10 text-right">${util}%</span>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-xs text-slate-500">${date}</td>
+                    <td class="px-6 py-4">${badgeHtml}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function applyFilters() {
+            const q      = document.getElementById('search-input').value.toLowerCase();
+            const status = document.getElementById('filter-status').value;
+
+            const filtered = allRecords.filter(r => {
+                const matchText = !q || (r.supplier_name || '').toLowerCase().includes(q);
+                const util = r.utilization_pct || 0;
+                const matchStatus = !status ||
+                    (status === 'high'   && util >= 90) ||
+                    (status === 'medium' && util >= 60 && util < 90) ||
+                    (status === 'low'    && util < 60);
+                return matchText && matchStatus;
+            });
+
+            renderTable(filtered);
+        }
+
+        document.getElementById('search-input').addEventListener('input', applyFilters);
+        document.getElementById('filter-status').addEventListener('change', applyFilters);
+
+        function escHtml(s) {
+            return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        }
+
+        async function logout() {
+            await fetch('/logout');
+            window.location.href = '/admin/login';
+        }
+
+        checkAdmin().then(() => loadCapacities());
+    </script>
+</body>
+</html>
