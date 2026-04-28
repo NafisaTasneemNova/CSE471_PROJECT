@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block title %}Edit RFQ - {{ rfq.title }} - TexBid{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-[#f8f9fb] py-8">
+    <div class="max-w-3xl mx-auto px-4 sm:px-6">
+        <div class="mb-8 flex items-center justify-between">
+            <div>
+                <a href="/rfq/{{ rfq.id }}" class="text-sm font-semibold text-slate-500 hover:text-slate-800 transition flex items-center gap-1 mb-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                    Back to RFQ Details
+                </a>
+                <h1 class="text-3xl font-bold text-slate-900">Edit RFQ</h1>
+                <p class="text-sm text-slate-500 mt-1">Update the core information for your RFQ.</p>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl border border-[#E5E7EB] shadow-sm overflow-hidden">
+            <form id="edit-rfq-form" class="p-6 md:p-8 space-y-6">
+                <!-- Title -->
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-2">RFQ Title</label>
+                    <input type="text" name="title" value="{{ rfq.title }}" required
+                        class="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-[#1b4478] focus:ring-2 focus:ring-[#1b4478]/10 transition">
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Category -->
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">Product Category</label>
+                        <select name="product_category" required class="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-[#1b4478] focus:ring-2 focus:ring-[#1b4478]/10 transition">
+                            <option value="Knit" {% if rfq.product_category == 'Knit' %}selected{% endif %}>Knit</option>
+                            <option value="Woven" {% if rfq.product_category == 'Woven' %}selected{% endif %}>Woven</option>
+                            <option value="Denim" {% if rfq.product_category == 'Denim' %}selected{% endif %}>Denim</option>
+                            <option value="Outerwear" {% if rfq.product_category == 'Outerwear' %}selected{% endif %}>Outerwear</option>
+                            <option value="Activewear" {% if rfq.product_category == 'Activewear' %}selected{% endif %}>Activewear</option>
+                        </select>
+                    </div>
+
+                    <!-- Quantity -->
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">Total Quantity</label>
+                        <input type="number" name="quantity" value="{{ rfq.quantity }}" required
+                            class="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-[#1b4478] focus:ring-2 focus:ring-[#1b4478]/10 transition">
+                    </div>
+
+                    <!-- Fabric Type -->
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">Fabric Type</label>
+                        <select name="fabric_type" required class="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-[#1b4478] focus:ring-2 focus:ring-[#1b4478]/10 transition">
+                            <option value="Cotton" {% if rfq.fabric_type == 'Cotton' %}selected{% endif %}>Cotton</option>
+                            <option value="Polyester" {% if rfq.fabric_type == 'Polyester' %}selected{% endif %}>Polyester</option>
+                            <option value="Linen" {% if rfq.fabric_type == 'Linen' %}selected{% endif %}>Linen</option>
+                            <option value="Silk" {% if rfq.fabric_type == 'Silk' %}selected{% endif %}>Silk</option>
+                            <option value="Blend" {% if rfq.fabric_type == 'Blend' %}selected{% endif %}>Blend</option>
+                        </select>
+                    </div>
+
+                    <!-- Fabric GSM -->
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">Fabric GSM</label>
+                        <input type="text" name="fabric_gsm" value="{{ rfq.fabric_gsm or '' }}" placeholder="e.g. 160-190 GSM"
+                            class="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-[#1b4478] focus:ring-2 focus:ring-[#1b4478]/10 transition">
+                    </div>
+                </div>
+
+                <!-- Urgency -->
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-2">Urgency Level</label>
+                    <select name="urgency_level" required class="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-[#1b4478] focus:ring-2 focus:ring-[#1b4478]/10 transition">
+                        <option value="LOW" {% if rfq.urgency_level == 'LOW' %}selected{% endif %}>Low</option>
+                        <option value="MEDIUM" {% if rfq.urgency_level == 'MEDIUM' %}selected{% endif %}>Medium</option>
+                        <option value="HIGH" {% if rfq.urgency_level == 'HIGH' %}selected{% endif %}>High</option>
+                    </select>
+                </div>
+
+                <div class="pt-6 border-t border-slate-100 flex items-center justify-end gap-3">
+                    <a href="/rfq/{{ rfq.id }}" class="px-5 py-2.5 text-sm font-semibold text-slate-600 hover:text-slate-800 transition">Cancel</a>
+                    <button type="submit" id="save-btn" class="px-6 py-2.5 bg-blue-600 text-white text-sm font-bold rounded-lg hover:bg-blue-700 transition shadow-md flex items-center gap-2">
+                        Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('edit-rfq-form');
+    const saveBtn = document.getElementById('save-btn');
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Saving...';
+
+        const formData = new FormData(form);
+
+        try {
+            const response = await fetch('/api/rfq/{{ rfq.id }}', {
+                method: 'PUT',
+                body: formData
+            });
+
+            const data = await response.json();
+            
+            if (response.ok && data.success) {
+                // Show success and redirect
+                saveBtn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> Saved!';
+                saveBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+                saveBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+                
+                setTimeout(() => {
+                    window.location.href = '/rfq/{{ rfq.id }}';
+                }, 800);
+            } else {
+                throw new Error(data.error || 'Failed to update RFQ');
+            }
+        } catch (err) {
+            console.error('Update error:', err);
+            alert('Error updating RFQ: ' + err.message);
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Save Changes';
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+
+{% block title %}Reverse Auctions - TexBid{% endblock %}
+
+{% block content %}
+<div class="bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen py-12">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <!-- Header -->
+        <div class="mb-12">
+            <div class="flex items-center gap-3 mb-4">
+                <svg class="h-10 w-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                </svg>
+                <h1 class="text-4xl font-bold text-gray-900">Reverse Auctions</h1>
+            </div>
+            <p class="text-lg text-gray-600">Compete with suppliers worldwide. Lower your price to win contracts!</p>
+        </div>
+
+        <!-- Active Auctions -->
+        <div class="mb-12">
+            <h2 class="text-2xl font-bold text-gray-900 mb-6">🔥 Active Auctions</h2>
+            
+            {% if active_auctions %}
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {% for auction in active_auctions %}
+                <div class="bg-white rounded-lg shadow-md hover:shadow-xl transition-shadow overflow-hidden border-t-4 border-blue-600">
+                    <!-- Card Header -->
+                    <div class="bg-gradient-to-r from-blue-50 to-blue-100 px-6 py-4 border-b border-gray-200">
+                        <h3 class="text-lg font-bold text-gray-900">{{ auction.get('title', 'Untitled RFQ') }}</h3>
+                        <p class="text-sm text-gray-600 mt-1">{{ auction.get('product_category', 'N/A') }}</p>
+                    </div>
+
+                    <!-- Card Body -->
+                    <div class="px-6 py-4 space-y-3">
+                        <!-- Quantity -->
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600 text-sm font-semibold">Quantity:</span>
+                            <span class="text-gray-900 font-bold">{{ auction.get('quantity', 0) }} units</span>
+                        </div>
+
+                        <!-- Fabric Type -->
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600 text-sm font-semibold">Fabric:</span>
+                            <span class="text-gray-900">{{ auction.get('fabric_type', 'N/A') }}</span>
+                        </div>
+
+                        <!-- Current Lowest Bid -->
+                        <div class="bg-green-50 p-3 rounded-lg border border-green-200">
+                            <p class="text-xs text-gray-600 mb-1">Current Lowest Bid</p>
+                            {% if auction.get('current_lowest_bid') %}
+                            <p class="text-2xl font-bold text-green-600">${{ "%.2f"|format(auction.get('current_lowest_bid')) }}</p>
+                            {% else %}
+                            <p class="text-lg font-bold text-gray-600">No bids yet</p>
+                            {% endif %}
+                        </div>
+
+                        <!-- Bid Count -->
+                        <div class="flex justify-between items-center text-sm">
+                            <span class="text-gray-600">Bids Placed:</span>
+                            <span class="bg-blue-100 text-blue-800 font-semibold px-3 py-1 rounded-full">{{ auction.get('bid_count', 0) }}</span>
+                        </div>
+
+                        <!-- Time Remaining -->
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600 text-sm font-semibold">Time Left:</span>
+                            <span class="text-red-600 font-bold text-sm" id="timer-{{ auction.get('id') }}">
+                                {% if auction.get('time_remaining') %}
+                                    {% set hours = (auction.get('time_remaining') // 3600)|int %}
+                                    {% set minutes = ((auction.get('time_remaining') % 3600) // 60)|int %}
+                                    {% set secs = (auction.get('time_remaining') % 60)|int %}
+                                    {{ "%02d"|format(hours) }}:{{ "%02d"|format(minutes) }}:{{ "%02d"|format(secs) }}
+                                {% else %}
+                                    Closed
+                                {% endif %}
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Card Footer -->
+                    <div class="px-6 py-4 bg-gray-50 border-t border-gray-200">
+                        <a href="/auction/{{ auction.get('id') }}"
+                            class="w-full inline-flex items-center justify-center px-4 py-2.5 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors">
+                            <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                            </svg>
+                            Enter Auction
+                        </a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="bg-white rounded-lg shadow-md p-12 text-center">
+                <svg class="h-16 w-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
+                </svg>
+                <h3 class="text-xl font-bold text-gray-900 mb-2">No Active Auctions</h3>
+                <p class="text-gray-600 mb-4">Create an RFQ and enable <strong>reverse auction</strong> on the review step, or open an auction room using the RFQ ID from Browse RFQs.</p>
+                <div class="flex flex-wrap gap-3 justify-center">
+                    <a href="/rfq/create" class="inline-block bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+                        Create RFQ
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- How It Works -->
+        <div class="bg-white rounded-lg shadow-md p-8 mt-12">
+            <h2 class="text-2xl font-bold text-gray-900 mb-6">How Reverse Auctions Work</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div class="text-center">
+                    <div class="flex justify-center mb-4">
+                        <div class="bg-blue-100 text-blue-600 rounded-full w-16 h-16 flex items-center justify-center text-2xl font-bold">1</div>
+                    </div>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">Browse Auctions</h3>
+                    <p class="text-gray-600">View active reverse auction RFQs and their specifications</p>
+                </div>
+                <div class="text-center">
+                    <div class="flex justify-center mb-4">
+                        <div class="bg-blue-100 text-blue-600 rounded-full w-16 h-16 flex items-center justify-center text-2xl font-bold">2</div>
+                    </div>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">Place Your Bid</h3>
+                    <p class="text-gray-600">Enter your company name and bid lower than the current lowest</p>
+                </div>
+                <div class="text-center">
+                    <div class="flex justify-center mb-4">
+                        <div class="bg-blue-100 text-blue-600 rounded-full w-16 h-16 flex items-center justify-center text-2xl font-bold">3</div>
+                    </div>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">Compete & Win</h3>
+                    <p class="text-gray-600">Update your bid multiple times until the auction ends. Lowest price wins!</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Update timers every second
+    setInterval(() => {
+        const timerElements = document.querySelectorAll('[id^="timer-"]');
+        timerElements.forEach(el => {
+            const rfqId = el.id.replace('timer-', '');
+            // You can add AJAX call here to get real-time timer updates if needed
+            // For now, timers will be static until page refresh
+        });
+    }, 1000);
+</script>
+{% endblock %}

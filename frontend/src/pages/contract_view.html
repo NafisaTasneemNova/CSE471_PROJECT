@@ -1,0 +1,396 @@
+﻿{% extends "base.html" %}
+{% block title %}Contract {{ contract.contract_id }} – TexBid{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50 py-10">
+  <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+
+    <!-- Header -->
+    <div class="mb-6 flex items-center justify-between flex-wrap gap-4">
+      <div>
+        <a href="/contracts" class="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1 mb-2">
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+          </svg>
+          My Contracts
+        </a>
+        <h1 class="text-2xl font-extrabold text-gray-900">Contract {{ contract.contract_id }}</h1>
+        <p class="text-sm text-gray-500 mt-0.5">{{ contract.rfq_title }}</p>
+      </div>
+      <div class="flex items-center gap-3">
+        {% if contract.status == 'FULLY_EXECUTED' %}
+        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-100 text-green-800 text-sm font-bold">
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+          </svg>
+          Fully Executed
+        </span>
+        {% elif contract.status == 'PENDING_SUPPLIER_SIGNATURE' %}
+        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-yellow-100 text-yellow-800 text-sm font-bold">
+          <span class="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></span>
+          Awaiting Supplier Signature
+        </span>
+        {% else %}
+        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-100 text-blue-800 text-sm font-bold">
+          <span class="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+          Awaiting Buyer Signature
+        </span>
+        {% endif %}
+        <button onclick="window.print()"
+          class="inline-flex items-center gap-2 px-4 py-2 bg-gray-700 text-white text-sm font-semibold rounded-lg hover:bg-gray-800 transition-colors">
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+          </svg>
+          Print / Save PDF
+        </button>
+      </div>
+    </div>
+
+    <!-- Hash integrity -->
+    {% if hash_valid %}
+    <div class="mb-4 flex items-center gap-2 text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-4 py-2">
+      <svg class="h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+      </svg>
+      <span><strong>Document integrity verified.</strong> This contract has not been tampered with. Hash: <span class="font-mono">{{ contract.content_hash[:24] }}…</span></span>
+    </div>
+    {% else %}
+    {% endif %}
+
+    <!-- Contract Document -->
+    <div id="contract-document" class="bg-white rounded-2xl shadow-lg overflow-hidden mb-6">
+      <div class="bg-gradient-to-r from-brand-primary to-brand-light px-8 py-6 text-white">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-2xl font-extrabold tracking-tight">CONTRACT AGREEMENT</h2>
+            <p class="text-blue-200 text-sm mt-1">TexBid Garment Order Exchange Platform</p>
+          </div>
+          <div class="text-right text-sm text-blue-200">
+            <p class="font-bold text-white">{{ contract.contract_id }}</p>
+            <p>{{ contract.created_at.strftime('%d %B %Y') if contract.created_at is not string else contract.created_at[:10] }}</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-8 space-y-8 text-sm text-gray-800">
+
+        <section>
+          <h3 class="text-base font-bold text-gray-900 border-b border-gray-200 pb-2 mb-4">1. PARTIES</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="bg-blue-50 rounded-lg p-4">
+              <p class="text-xs font-bold text-blue-600 uppercase mb-2">Buyer</p>
+              <p class="font-bold">{{ contract.buyer_legal_name }}</p>
+              <p class="text-gray-600">{{ contract.buyer_email }}</p>
+            </div>
+            <div class="bg-green-50 rounded-lg p-4">
+              <p class="text-xs font-bold text-green-600 uppercase mb-2">Supplier</p>
+              <p class="font-bold">{{ contract.supplier_legal_name }}</p>
+              <p class="text-gray-600">{{ contract.supplier_email }}</p>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <h3 class="text-base font-bold text-gray-900 border-b border-gray-200 pb-2 mb-4">2. ORDER DETAILS</h3>
+          <table class="w-full text-sm"><tbody class="divide-y divide-gray-100">
+            <tr><td class="py-2 text-gray-500 w-40">Product</td><td class="py-2 font-semibold">{{ contract.rfq_title }}</td></tr>
+            <tr><td class="py-2 text-gray-500">Category</td><td class="py-2 font-semibold">{{ contract.rfq_product_category }}</td></tr>
+            <tr><td class="py-2 text-gray-500">Fabric</td><td class="py-2 font-semibold">{{ contract.rfq_fabric_type }}</td></tr>
+            <tr><td class="py-2 text-gray-500">Quantity</td><td class="py-2 font-semibold">{{ "{:,}".format(contract.rfq_quantity) }} units</td></tr>
+            <tr><td class="py-2 text-gray-500">Unit Price</td><td class="py-2 font-semibold">BDT {{ "{:,.2f}".format(contract.bid_price) }}</td></tr>
+            <tr><td class="py-2 text-gray-500">Total Value</td><td class="py-2 font-bold text-green-700 text-base">BDT {{ "{:,.2f}".format(contract.bid_total_value) }}</td></tr>
+          </tbody></table>
+        </section>
+
+        <section>
+          <h3 class="text-base font-bold text-gray-900 border-b border-gray-200 pb-2 mb-4">3. DELIVERY TERMS</h3>
+          <table class="w-full text-sm"><tbody class="divide-y divide-gray-100">
+            <tr><td class="py-2 text-gray-500 w-40">Incoterm</td><td class="py-2 font-semibold">{{ contract.rfq_incoterm }}</td></tr>
+            <tr><td class="py-2 text-gray-500">Shipping Method</td><td class="py-2 font-semibold">{{ contract.rfq_shipping_method or 'TBD' }}</td></tr>
+            <tr><td class="py-2 text-gray-500">Destination Port</td><td class="py-2 font-semibold">{{ contract.rfq_destination_port or 'TBD' }}</td></tr>
+          </tbody></table>
+        </section>
+
+        <section>
+          <h3 class="text-base font-bold text-gray-900 border-b border-gray-200 pb-2 mb-4">4. SAMPLE REQUIREMENTS</h3>
+          <table class="w-full text-sm"><tbody class="divide-y divide-gray-100">
+            <tr><td class="py-2 text-gray-500 w-48">Proto Sample Required</td><td class="py-2 font-semibold">{{ 'Yes' if contract.rfq_proto_sample_req else 'No' }}</td></tr>
+            <tr><td class="py-2 text-gray-500">Pre-Production Sample</td><td class="py-2 font-semibold">{{ 'Yes' if contract.rfq_pp_sample_req else 'No' }}</td></tr>
+            <tr><td class="py-2 text-gray-500">Approval Process</td><td class="py-2 font-semibold">Digital approval/rejection via TexBid platform</td></tr>
+          </tbody></table>
+        </section>
+
+        <section>
+          <h3 class="text-base font-bold text-gray-900 border-b border-gray-200 pb-2 mb-4">5. PAYMENT & ESCROW CONDITIONS</h3>
+          <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-1.5 text-xs leading-relaxed">
+            <p>• Buyer deposits full order value into TexBid escrow before production begins.</p>
+            <p>• Funds released to supplier only after buyer confirms receipt OR admin verifies delivery.</p>
+            <p>• Partial release permitted at milestones (e.g. 30% on PP sample approval, 70% on final delivery).</p>
+          </div>
+        </section>
+
+        <section>
+          <h3 class="text-base font-bold text-gray-900 border-b border-gray-200 pb-2 mb-4">6. DISPUTE RESOLUTION</h3>
+          <div class="space-y-2 text-xs leading-relaxed">
+            <div class="bg-gray-50 rounded-lg p-3"><p class="font-bold mb-1">6.1 Refund Clause</p><p>If supplier fails to deliver within deadline or goods fail quality inspection, buyer is entitled to full or partial refund from escrow.</p></div>
+            <div class="bg-gray-50 rounded-lg p-3"><p class="font-bold mb-1">6.2 Partial Payment Clause</p><p>If goods are partially delivered or defective, escrow is split proportionally based on evidence submitted by both parties.</p></div>
+            <div class="bg-gray-50 rounded-lg p-3"><p class="font-bold mb-1">6.3 Re-shipment Clause</p><p>If goods are rejected due to quality failure, supplier must re-ship conforming goods at their own cost, or a refund is triggered.</p></div>
+            <div class="bg-gray-50 rounded-lg p-3"><p class="font-bold mb-1">6.4 Contract Enforcement Clause</p><p>Both parties agree this contract is legally binding. TexBid reserves the right to freeze escrow funds and escalate to legal enforcement if either party acts in bad faith.</p></div>
+          </div>
+        </section>
+
+        <section>
+          <h3 class="text-base font-bold text-gray-900 border-b border-gray-200 pb-2 mb-4">7. CONFIDENTIALITY</h3>
+          <p class="text-xs leading-relaxed">Both parties agree to keep pricing, product specifications, and communication confidential and not disclose to third parties without written consent.</p>
+        </section>
+
+        <section>
+          <h3 class="text-base font-bold text-gray-900 border-b border-gray-200 pb-2 mb-4">8. FORCE MAJEURE</h3>
+          <p class="text-xs leading-relaxed">Neither party is liable for delays caused by events beyond reasonable control including natural disasters, pandemics, port strikes, or government restrictions.</p>
+        </section>
+
+        {% if contract.rfq_special_instructions %}
+        <section>
+          <h3 class="text-base font-bold text-gray-900 border-b border-gray-200 pb-2 mb-4">9. SPECIAL INSTRUCTIONS</h3>
+          <p class="text-xs leading-relaxed">{{ contract.rfq_special_instructions }}</p>
+        </section>
+        {% endif %}
+
+        <!-- Signature Block -->
+        <section>
+          <h3 class="text-base font-bold text-gray-900 border-b border-gray-200 pb-2 mb-6">10. DIGITAL SIGNATURES</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            <!-- Buyer signature -->
+            <div class="border-2 rounded-xl p-5 {% if contract.buyer_signed_at %}border-green-400 bg-green-50{% else %}border-dashed border-gray-300 bg-gray-50{% endif %}">
+              <p class="text-xs font-bold text-gray-500 uppercase mb-3">Buyer Signature</p>
+              {% if contract.buyer_signature_image %}
+              <img src="{{ contract.buyer_signature_image }}" alt="Buyer signature" class="h-16 w-full object-contain border border-gray-200 rounded bg-white mb-2">
+              {% elif contract.buyer_signed_at %}
+              <div class="h-16 flex items-center justify-center border border-gray-200 rounded bg-white mb-2">
+                <span class="text-gray-400 text-xs italic">Signature on file</span>
+              </div>
+              {% else %}
+              <div class="h-16 flex items-center justify-center border border-dashed border-gray-300 rounded bg-white mb-2">
+                <span class="text-gray-300 text-xs">Awaiting signature</span>
+              </div>
+              {% endif %}
+              <p class="text-sm font-semibold">{{ contract.buyer_legal_name }}</p>
+              {% if contract.buyer_signed_at %}
+              <p class="text-xs text-green-700 font-bold mt-1">✓ SIGNED</p>
+              <p class="text-xs text-gray-500">{{ contract.buyer_signed_at.strftime('%d %b %Y %H:%M UTC') if contract.buyer_signed_at is not string else contract.buyer_signed_at[:16].replace('T',' ') + ' UTC' }}</p>
+              {% else %}
+              <p class="text-xs text-gray-400 italic mt-1">Pending</p>
+              {% endif %}
+            </div>
+
+            <!-- Supplier signature -->
+            <div class="border-2 rounded-xl p-5 {% if contract.supplier_signed_at %}border-green-400 bg-green-50{% else %}border-dashed border-gray-300 bg-gray-50{% endif %}">
+              <p class="text-xs font-bold text-gray-500 uppercase mb-3">Supplier Signature</p>
+              {% if contract.supplier_signature_image %}
+              <img src="{{ contract.supplier_signature_image }}" alt="Supplier signature" class="h-16 w-full object-contain border border-gray-200 rounded bg-white mb-2">
+              {% elif contract.supplier_signed_at %}
+              <div class="h-16 flex items-center justify-center border border-gray-200 rounded bg-white mb-2">
+                <span class="text-gray-400 text-xs italic">Signature on file</span>
+              </div>
+              {% else %}
+              <div class="h-16 flex items-center justify-center border border-dashed border-gray-300 rounded bg-white mb-2">
+                <span class="text-gray-300 text-xs">Awaiting signature</span>
+              </div>
+              {% endif %}
+              <p class="text-sm font-semibold">{{ contract.supplier_legal_name }}</p>
+              {% if contract.supplier_signed_at %}
+              <p class="text-xs text-green-700 font-bold mt-1">✓ SIGNED</p>
+              <p class="text-xs text-gray-500">{{ contract.supplier_signed_at.strftime('%d %b %Y %H:%M UTC') if contract.supplier_signed_at is not string else contract.supplier_signed_at[:16].replace('T',' ') + ' UTC' }}</p>
+              {% else %}
+              <p class="text-xs text-gray-400 italic mt-1">Pending</p>
+              {% endif %}
+            </div>
+
+          </div>
+          <div class="mt-4 text-center text-xs text-gray-400">
+            Platform Verified: TexBid &nbsp;|&nbsp; Contract ID: {{ contract.contract_id }} &nbsp;|&nbsp; Hash: {{ contract.content_hash[:24] }}…
+          </div>
+        </section>
+
+      </div>
+    </div>
+
+    <!-- ===== SIGNATURE PAD ===== -->
+    {% if contract.status != 'FULLY_EXECUTED' %}
+    {% if (is_buyer and not contract.buyer_signed_at) or (is_supplier and not contract.supplier_signed_at and contract.buyer_signed_at) %}
+    <div class="bg-white rounded-2xl shadow-lg p-6 mb-6" id="signature-section">
+      <h2 class="text-lg font-bold text-gray-900 mb-1">
+        {% if is_buyer %}Sign as Buyer{% else %}Sign as Supplier{% endif %}
+      </h2>
+      <p class="text-sm text-gray-500 mb-5">Draw your signature in the box below, then click <strong>Submit Signature</strong>. Your drawn signature, user ID, and timestamp will be permanently recorded.</p>
+
+      <!-- Canvas pad -->
+      <div class="relative border-2 border-gray-300 rounded-xl bg-white overflow-hidden" style="touch-action: none;">
+        <canvas id="sig-canvas" width="700" height="160" class="w-full cursor-crosshair block"></canvas>
+        <div id="sig-placeholder" class="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <p class="text-gray-300 text-sm select-none">✍ Draw your signature here</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3 mt-3">
+        <button onclick="clearSignature()" class="px-4 py-2 border border-gray-300 text-gray-600 text-sm font-semibold rounded-lg hover:bg-gray-50 transition-colors">
+          Clear
+        </button>
+        <div class="flex items-center gap-2 text-xs text-gray-400">
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+          </svg>
+          Use mouse or touch to draw
+        </div>
+        <div class="ml-auto flex items-center gap-3">
+          <label class="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+            <input type="checkbox" id="sig-confirm" class="rounded border-gray-300 text-blue-600">
+            I have read and agree to all terms in this contract
+          </label>
+        </div>
+      </div>
+
+      <button id="submit-sig-btn" onclick="submitSignature('{{ contract.contract_id }}')"
+        class="mt-4 w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-colors shadow flex items-center justify-center gap-2 text-base">
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+        </svg>
+        Submit Signature
+      </button>
+
+      <div id="sig-error" class="hidden mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm font-semibold text-red-700"></div>
+    </div>
+    {% elif is_supplier and not contract.buyer_signed_at %}
+    <div class="bg-yellow-50 border border-yellow-200 rounded-2xl p-5 mb-6 flex gap-3">
+      <svg class="h-5 w-5 text-yellow-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01"/>
+      </svg>
+      <p class="text-sm text-yellow-800">Waiting for the buyer to sign first before you can sign.</p>
+    </div>
+    {% endif %}
+    {% else %}
+    <div class="bg-green-50 border border-green-200 rounded-2xl p-6 mb-6 flex gap-4">
+      <svg class="h-8 w-8 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      <div>
+        <p class="font-bold text-green-800">Contract Fully Executed</p>
+        <p class="text-sm text-green-700 mt-0.5">Both parties have signed. This contract is legally binding. Production can begin.</p>
+        {% if contract.executed_at %}
+        <p class="text-xs text-green-600 mt-1">Executed: {{ contract.executed_at.strftime('%d %b %Y %H:%M UTC') if contract.executed_at is not string else contract.executed_at[:16].replace('T',' ') + ' UTC' }}</p>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    <p class="text-xs text-gray-400 text-center">This contract is generated and stored by TexBid. Legal clauses are standardized and cannot be modified by either party.</p>
+
+  </div>
+</div>
+
+<script>
+// ===== Signature Pad =====
+const canvas = document.getElementById('sig-canvas');
+const ctx = canvas ? canvas.getContext('2d') : null;
+let drawing = false;
+let hasSigned = false;
+
+function resizeCanvas() {
+  if (!canvas) return;
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = rect.width * dpr;
+  canvas.height = 160 * dpr;
+  canvas.style.width = rect.width + 'px';
+  canvas.style.height = '160px';
+  ctx.scale(dpr, dpr);
+  ctx.strokeStyle = '#1e3a5f';
+  ctx.lineWidth = 2.5;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+}
+
+function getPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  if (e.touches) {
+    return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
+  }
+  return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+}
+
+if (canvas) {
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+
+  canvas.addEventListener('mousedown', e => { drawing = true; const p = getPos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); });
+  canvas.addEventListener('mousemove', e => { if (!drawing) return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); hasSigned = true; document.getElementById('sig-placeholder').style.display = 'none'; });
+  canvas.addEventListener('mouseup', () => drawing = false);
+  canvas.addEventListener('mouseleave', () => drawing = false);
+
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); drawing = true; const p = getPos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); }, { passive: false });
+  canvas.addEventListener('touchmove', e => { e.preventDefault(); if (!drawing) return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); hasSigned = true; document.getElementById('sig-placeholder').style.display = 'none'; }, { passive: false });
+  canvas.addEventListener('touchend', () => drawing = false);
+}
+
+function clearSignature() {
+  if (!ctx) return;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  hasSigned = false;
+  document.getElementById('sig-placeholder').style.display = '';
+}
+
+async function submitSignature(contractId) {
+  const errEl = document.getElementById('sig-error');
+  errEl.classList.add('hidden');
+
+  if (!hasSigned) {
+    errEl.textContent = 'Please draw your signature before submitting.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+  if (!document.getElementById('sig-confirm').checked) {
+    errEl.textContent = 'Please confirm you have read and agree to all terms.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  const signatureImage = canvas.toDataURL('image/png');
+  const btn = document.getElementById('submit-sig-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<svg class="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Submitting…';
+
+  try {
+    const res = await fetch(`/api/contracts/${contractId}/sign`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ signature_image: signatureImage }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      // Scroll to top and reload to show the signed contract
+      window.scrollTo(0, 0);
+      setTimeout(() => window.location.reload(), 800);
+    } else {
+      errEl.textContent = data.detail || 'Failed to submit signature.';
+      errEl.classList.remove('hidden');
+      btn.disabled = false;
+      btn.textContent = 'Submit Signature';
+    }
+  } catch(e) {
+    errEl.textContent = 'Network error. Please try again.';
+    errEl.classList.remove('hidden');
+    btn.disabled = false;
+    btn.textContent = 'Submit Signature';
+  }
+}
+</script>
+
+<style>
+@media print {
+  nav, footer, #signature-section, .print\:hidden { display: none !important; }
+  #contract-document { box-shadow: none; border: 1px solid #ccc; }
+  body { background: white; }
+}
+</style>
+{% endblock %}

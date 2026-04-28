@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BRAC Bank Payment Gateway</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .payment-container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            max-width: 400px;
+            width: 100%;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .brac-logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+        
+        .brac-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 4px;
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(135deg, #1976d2 0%, #2196f3 50%, #ffcc02 50%, #ffd54f 100%);
+        }
+        
+        .brac-icon::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 50%;
+            background: linear-gradient(135deg, #1976d2 0%, #42a5f5 100%);
+            clip-path: polygon(0 0, 100% 0, 20% 100%, 0 100%);
+        }
+        
+        .brac-icon::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 100%;
+            height: 50%;
+            background: linear-gradient(135deg, #ffcc02 0%, #ffd54f 100%);
+            clip-path: polygon(80% 0, 100% 0, 100% 100%, 0 100%);
+        }
+        
+        .brac-text {
+            color: #1976d2;
+            font-size: 32px;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+        
+        .brac-bengali {
+            color: #1976d2;
+            font-size: 16px;
+            margin-top: 5px;
+            font-style: italic;
+        }
+        
+        .header p {
+            color: #666;
+            margin: 10px 0 0 0;
+            font-size: 14px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+            transition: border-color 0.3s;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: #1976d2;
+        }
+        
+        .card-number-container {
+            position: relative;
+        }
+        
+        .card-icons {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            gap: 8px;
+        }
+        
+        .visa-logo, .mastercard-logo {
+            width: 32px;
+            height: 20px;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: bold;
+            opacity: 0.4;
+            transition: opacity 0.3s;
+        }
+        
+        .visa-logo {
+            background: linear-gradient(135deg, #1a1f71 0%, #0066cc 100%);
+            color: white;
+        }
+        
+        .mastercard-logo {
+            background: linear-gradient(135deg, #eb001b 0%, #ff5f00 50%, #f79e1b 100%);
+            color: white;
+            position: relative;
+        }
+        
+        .mastercard-logo::before {
+            content: '';
+            position: absolute;
+            left: 6px;
+            width: 8px;
+            height: 8px;
+            background: #eb001b;
+            border-radius: 50%;
+        }
+        
+        .mastercard-logo::after {
+            content: '';
+            position: absolute;
+            right: 6px;
+            width: 8px;
+            height: 8px;
+            background: #f79e1b;
+            border-radius: 50%;
+        }
+        
+        .visa-logo.active, .mastercard-logo.active {
+            opacity: 1;
+        }
+        
+        .row {
+            display: flex;
+            gap: 15px;
+        }
+        
+        .row .form-group {
+            flex: 1;
+        }
+        
+        .amount-display {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .amount-display .amount {
+            font-size: 24px;
+            font-weight: bold;
+            color: #1976d2;
+        }
+        
+        .amount-display .merchant {
+            color: #666;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+        
+        .pay-button {
+            width: 100%;
+            background: #1976d2;
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 5px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 15px;
+        }
+        
+        .pay-button:hover {
+            background: #1565c0;
+            transform: translateY(-1px);
+        }
+        
+        .pay-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .cancel-button {
+            width: 100%;
+            background: transparent;
+            color: #666;
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .cancel-button:hover {
+            background: #f5f5f5;
+            color: #333;
+        }
+        
+        .security-info {
+            text-align: center;
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #eee;
+            color: #666;
+            font-size: 12px;
+        }
+        
+        .test-info {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-size: 12px;
+            color: #856404;
+        }
+    </style>
+</head>
+<body>
+    <div class="payment-container">
+        <div class="header">
+            <div class="brac-logo">
+                <div class="brac-icon"></div>
+                <div class="brac-text">BRAC BANK</div>
+            </div>
+            <div class="brac-bengali">আস্থা অবিচল</div>
+            <p>Secure Payment Gateway</p>
+        </div>
+        
+        {% if payment %}
+        <div class="amount-display">
+            <div class="amount">{{ payment.original_currency }} {{ "{:,.2f}".format(payment.original_amount) }}</div>
+            <div class="merchant">TexBid Platform</div>
+            <div style="font-size: 12px; color: #999; margin-top: 5px;">
+                Transaction: {{ txn }}
+            </div>
+        </div>
+        {% endif %}
+        
+        <form id="payment-form">
+            <input type="hidden" name="transaction_id" value="{{ txn }}">
+            
+            <div class="form-group">
+                <label for="card-number">Card Number</label>
+                <div class="card-number-container">
+                    <input type="text" id="card-number" name="card_number" placeholder="1234 5678 9012 3456" maxlength="19" required>
+                    <div class="card-icons">
+                        <div class="visa-logo" id="visa-icon">VISA</div>
+                        <div class="mastercard-logo" id="mastercard-icon"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="card-name">Cardholder Name</label>
+                <input type="text" id="card-name" name="card_name" placeholder="JOHN DOE" required>
+            </div>
+            
+            <div class="row">
+                <div class="form-group">
+                    <label for="expiry">Expiry Date</label>
+                    <input type="text" id="expiry" name="expiry" placeholder="MM/YY" maxlength="5" required>
+                </div>
+                <div class="form-group">
+                    <label for="cvv">CVV</label>
+                    <input type="text" id="cvv" name="cvv" placeholder="123" maxlength="4" required>
+                </div>
+            </div>
+            
+            <button type="submit" class="pay-button" id="pay-btn">
+                Pay Now
+            </button>
+        </form>
+        
+        <form method="POST" action="/api/payment/cancel">
+            <input type="hidden" name="transaction_id" value="{{ txn }}">
+            <button type="submit" class="cancel-button">Cancel Payment</button>
+        </form>
+        
+        <div class="security-info">
+            🔒 Secured by BRAC Bank SSL Encryption
+        </div>
+    </div>
+
+    <script>
+        // Format card number with spaces
+        document.getElementById('card-number').addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            value = value.substring(0, 16);
+            value = value.replace(/(.{4})/g, '$1 ').trim();
+            e.target.value = value;
+            
+            // Show appropriate card icon
+            const visaIcon = document.getElementById('visa-icon');
+            const mastercardIcon = document.getElementById('mastercard-icon');
+            
+            // Reset icons
+            visaIcon.classList.remove('active');
+            mastercardIcon.classList.remove('active');
+            
+            // Highlight based on card number
+            const cardNumber = value.replace(/\s/g, '');
+            if (cardNumber.startsWith('4')) {
+                visaIcon.classList.add('active');
+            } else if (cardNumber.startsWith('5') || cardNumber.startsWith('2')) {
+                mastercardIcon.classList.add('active');
+            }
+        });
+        
+        // Format expiry date
+        document.getElementById('expiry').addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length >= 2) {
+                value = value.substring(0, 2) + '/' + value.substring(2, 4);
+            }
+            e.target.value = value;
+        });
+        
+        // Only allow numbers in CVV
+        document.getElementById('cvv').addEventListener('input', function(e) {
+            e.target.value = e.target.value.replace(/\D/g, '');
+        });
+        
+        // Handle form submission
+        document.getElementById('payment-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const payBtn = document.getElementById('pay-btn');
+            payBtn.disabled = true;
+            payBtn.textContent = 'Processing...';
+            
+            // Simulate processing delay
+            setTimeout(function() {
+                // Create form to submit to success endpoint
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = '/api/payment/success';
+                
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'transaction_id';
+                input.value = '{{ txn }}';
+                form.appendChild(input);
+                
+                document.body.appendChild(form);
+                form.submit();
+            }, 2000);
+        });
+    </script>
+</body>
+</html>
