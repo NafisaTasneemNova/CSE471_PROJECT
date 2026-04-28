@@ -254,9 +254,10 @@ function connectWebSocket(rfqId) {
 
   chatSocket.onmessage = (event) => {
     const msg = JSON.parse(event.data);
-    if (msg.sender_id !== chatReceiverId && msg.receiver_id !== chatReceiverId) {
-      return;
-    }
+    // Accept messages that involve our chat partner OR are our own echoed messages
+    const isRelevant = msg.sender_id === chatReceiverId || msg.receiver_id === chatReceiverId || msg.sender_id === CURRENT_USER_ID;
+    if (!isRelevant) return;
+
     const container = document.getElementById('chatMessages');
     if (document.querySelector(`[data-msg-id="${msg.id}"]`)) return;
     
@@ -279,7 +280,7 @@ async function uploadChatImage() {
   if (!file) return;
 
   const formData = new FormData();
-  formData.append('image', file);
+  formData.append('file', file);
 
   try {
     const res = await fetch('/api/chat/upload-image', {
@@ -288,7 +289,7 @@ async function uploadChatImage() {
     });
     const data = await res.json();
     if (data.success) {
-      sendChatMessage(data.image_url);
+      sendChatMessage(data.url);
     } else {
       alert('Failed to upload image: ' + data.detail);
     }
@@ -315,7 +316,7 @@ async function sendChatMessage(imageUrl = null) {
     chatSocket.send(JSON.stringify(msgPayload));
   } else {
     try {
-      await fetch(`/api/chat/${currentChatRfqId}/send`, {
+      const res = await fetch(`/api/chat/${currentChatRfqId}/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(msgPayload)

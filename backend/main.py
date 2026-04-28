@@ -5578,7 +5578,21 @@ async def websocket_chat(websocket: WebSocket, rfq_id: str, user_id: str):
     """WebSocket endpoint for real-time buyer ↔ supplier chat within an RFQ context."""
     from database import db
 
+    # Resolve the effective sender_id:
+    # If user_id is a user account ID, check if they are a supplier and use company unique_id
+    # This ensures sender_id matches CURRENT_USER_ID on both buyer and supplier JS clients
+    effective_sender_id = user_id
+    if db is not None:
+        ws_user = await db["users"].find_one({"id": user_id})
+        if ws_user and ws_user.get("company_id"):
+            ws_company = await db["companies"].find_one({"id": ws_user["company_id"]})
+            if ws_company and ws_company.get("role") == "SUPPLIER":
+                effective_sender_id = ws_company.get("unique_id") or ws_company.get("id")
+
     await manager.connect(rfq_id, user_id, websocket)
+    # Also register under effective_sender_id so messages addressed to it are received
+    if effective_sender_id != user_id:
+        await manager.connect(rfq_id, effective_sender_id, websocket)
     try:
         while True:
             data = await websocket.receive_json()
@@ -5589,11 +5603,11 @@ async def websocket_chat(websocket: WebSocket, rfq_id: str, user_id: str):
             if not content and not image_url:
                 continue
 
-            # Build and persist the message
+            # Build and persist the message using the effective sender identity
             msg = {
                 "id": str(__import__('uuid').uuid4()),
                 "rfq_id": rfq_id,
-                "sender_id": user_id,
+                "sender_id": effective_sender_id,
                 "receiver_id": receiver_id,
                 "content": content,
                 "image_url": image_url,
@@ -5613,8 +5627,10 @@ async def websocket_chat(websocket: WebSocket, rfq_id: str, user_id: str):
 
             # Send to the specific receiver if connected
             await manager.send_personal_message(broadcast, rfq_id, receiver_id)
-            # Echo back to sender for confirmation
+            # Echo back to sender for confirmation (use both IDs to ensure delivery)
             await manager.send_personal_message(broadcast, rfq_id, user_id)
+            if effective_sender_id != user_id:
+                await manager.send_personal_message(broadcast, rfq_id, effective_sender_id)
 
             # Create notification for the receiver
             if receiver_id and db is not None:
@@ -5656,9 +5672,13 @@ async def websocket_chat(websocket: WebSocket, rfq_id: str, user_id: str):
 
     except WebSocketDisconnect:
         manager.disconnect(rfq_id, user_id)
+        if effective_sender_id != user_id:
+            manager.disconnect(rfq_id, effective_sender_id)
     except Exception as e:
         print(f"WebSocket error for user {user_id} in RFQ {rfq_id}: {e}")
         manager.disconnect(rfq_id, user_id)
+        if effective_sender_id != user_id:
+            manager.disconnect(rfq_id, effective_sender_id)
 
 
 @app.post("/api/chat/{rfq_id}/send")

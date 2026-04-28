@@ -444,9 +444,9 @@ function connectWebSocket() {
 
   chatSocket.onmessage = (event) => {
     const msg = JSON.parse(event.data);
-    if (msg.sender_id !== chatReceiverId && msg.receiver_id !== chatReceiverId) {
-      return;
-    }
+    // Accept messages that involve our chat partner OR are our own echoed messages
+    const isRelevant = msg.sender_id === chatReceiverId || msg.receiver_id === chatReceiverId || msg.sender_id === CURRENT_USER_ID;
+    if (!isRelevant) return;
     const container = document.getElementById('chatMessages');
     if (document.querySelector(`[data-msg-id="${msg.id}"]`)) return;
     // Remove empty-state placeholder if present
