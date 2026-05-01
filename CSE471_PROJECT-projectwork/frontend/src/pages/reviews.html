@@ -1,0 +1,376 @@
+{% extends "base.html" %}
+
+{% block title %}My Reviews – TexBid{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-slate-50 to-purple-50 py-12">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+
+    <!-- Header -->
+    <div class="mb-8 flex items-center justify-between">
+      <div>
+        <h1 class="text-3xl font-extrabold text-gray-900">My Reviews</h1>
+        <p class="text-gray-500 text-sm mt-1">Track all your given and received reviews.</p>
+      </div>
+      <a href="/dashboard"
+        class="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white text-sm font-semibold rounded-lg hover:bg-purple-700 transition-colors">
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+        </svg>
+        Dashboard
+      </a>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loadingState" class="text-center py-12">
+      <div class="inline-flex items-center gap-3 text-gray-500">
+        <svg class="animate-spin h-6 w-6" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <span class="text-sm font-medium">Loading reviews...</span>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div id="mainContent" class="hidden">
+      
+      <!-- Summary Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <!-- Given Reviews -->
+        <div class="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-blue-500">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm font-semibold text-gray-600 uppercase tracking-wide">Reviews Given</p>
+              <p id="givenCount" class="text-3xl font-bold text-gray-900 mt-1">0</p>
+            </div>
+            <div class="p-3 bg-blue-100 rounded-full">
+              <svg class="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Received Reviews -->
+        <div class="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-green-500">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm font-semibold text-gray-600 uppercase tracking-wide">Reviews Received</p>
+              <p id="receivedCount" class="text-3xl font-bold text-gray-900 mt-1">0</p>
+            </div>
+            <div class="p-3 bg-green-100 rounded-full">
+              <svg class="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Average Rating -->
+        <div class="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-purple-500">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm font-semibold text-gray-600 uppercase tracking-wide">Positive Rating</p>
+              <p id="avgRating" class="text-3xl font-bold text-gray-900 mt-1">0%</p>
+            </div>
+            <div class="p-3 bg-purple-100 rounded-full">
+              <svg class="h-6 w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Navigation -->
+      <div class="bg-white rounded-2xl shadow-lg overflow-hidden">
+        <div class="border-b border-gray-200">
+          <nav class="flex">
+            <button id="givenTab" 
+                    class="tab-button flex-1 py-4 px-6 text-center text-sm font-semibold transition-colors border-b-2 border-purple-500 text-purple-600 bg-purple-50"
+                    onclick="switchTab('given')">
+              <div class="flex items-center justify-center gap-2">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"/>
+                </svg>
+                Reviews Given
+              </div>
+            </button>
+            <button id="receivedTab" 
+                    class="tab-button flex-1 py-4 px-6 text-center text-sm font-semibold transition-colors border-b-2 border-transparent text-gray-500 hover:text-gray-700"
+                    onclick="switchTab('received')">
+              <div class="flex items-center justify-center gap-2">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
+                </svg>
+                Reviews Received
+              </div>
+            </button>
+          </nav>
+        </div>
+
+        <!-- Tab Content -->
+        <div class="p-6">
+          <!-- Given Reviews Tab -->
+          <div id="givenContent" class="tab-content">
+            <div id="givenReviews" class="space-y-4">
+              <!-- Reviews will be loaded here -->
+            </div>
+            <div id="givenEmpty" class="hidden text-center py-12">
+              <div class="inline-flex items-center justify-center w-16 h-16 bg-gray-100 rounded-full mb-4">
+                <svg class="h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"/>
+                </svg>
+              </div>
+              <h3 class="text-lg font-semibold text-gray-900 mb-2">No reviews given yet</h3>
+              <p class="text-gray-500 text-sm">Complete transactions and leave reviews to help build trust in the community.</p>
+            </div>
+          </div>
+
+          <!-- Received Reviews Tab -->
+          <div id="receivedContent" class="tab-content hidden">
+            <div id="receivedReviews" class="space-y-4">
+              <!-- Reviews will be loaded here -->
+            </div>
+            <div id="receivedEmpty" class="hidden text-center py-12">
+              <div class="inline-flex items-center justify-center w-16 h-16 bg-gray-100 rounded-full mb-4">
+                <svg class="h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
+                </svg>
+              </div>
+              <h3 class="text-lg font-semibold text-gray-900 mb-2">No reviews received yet</h3>
+              <p class="text-gray-500 text-sm">Complete transactions to start receiving reviews from your trading partners.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Error State -->
+    <div id="errorState" class="hidden text-center py-12">
+      <div class="inline-flex items-center justify-center w-16 h-16 bg-red-100 rounded-full mb-4">
+        <svg class="h-8 w-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+      </div>
+      <h3 class="text-lg font-semibold text-gray-900 mb-2">Failed to load reviews</h3>
+      <p class="text-gray-500 text-sm mb-4">There was an error loading your review data.</p>
+      <button onclick="loadReviews()" 
+              class="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white text-sm font-semibold rounded-lg hover:bg-purple-700 transition-colors">
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+        </svg>
+        Retry
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<script>
+let currentTab = 'given';
+let givenReviews = [];
+let receivedReviews = [];
+
+// Load all review data on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadReviews();
+});
+
+async function loadReviews() {
+    try {
+        showLoading();
+        
+        // Load all data in parallel
+        const [summaryResponse, givenResponse, receivedResponse] = await Promise.all([
+            fetch('/api/reviews/summary'),
+            fetch('/api/reviews/given'),
+            fetch('/api/reviews/received')
+        ]);
+        
+        if (!summaryResponse.ok || !givenResponse.ok || !receivedResponse.ok) {
+            throw new Error('Failed to fetch review data');
+        }
+        
+        const summaryData = await summaryResponse.json();
+        const givenData = await givenResponse.json();
+        const receivedData = await receivedResponse.json();
+        
+        // Update summary cards
+        document.getElementById('givenCount').textContent = summaryData.given_count;
+        document.getElementById('receivedCount').textContent = summaryData.received_count;
+        document.getElementById('avgRating').textContent = summaryData.avg_rating + '%';
+        
+        // Store review data
+        givenReviews = givenData.reviews;
+        receivedReviews = receivedData.reviews;
+        
+        // Render current tab
+        renderReviews();
+        showContent();
+        
+    } catch (error) {
+        console.error('Error loading reviews:', error);
+        showError();
+    }
+}
+
+function renderReviews() {
+    if (currentTab === 'given') {
+        renderGivenReviews();
+    } else {
+        renderReceivedReviews();
+    }
+}
+
+function renderGivenReviews() {
+    const container = document.getElementById('givenReviews');
+    const emptyState = document.getElementById('givenEmpty');
+    
+    if (givenReviews.length === 0) {
+        container.innerHTML = '';
+        emptyState.classList.remove('hidden');
+        return;
+    }
+    
+    emptyState.classList.add('hidden');
+    container.innerHTML = givenReviews.map(review => createReviewCard(review, 'given')).join('');
+}
+
+function renderReceivedReviews() {
+    const container = document.getElementById('receivedReviews');
+    const emptyState = document.getElementById('receivedEmpty');
+    
+    if (receivedReviews.length === 0) {
+        container.innerHTML = '';
+        emptyState.classList.remove('hidden');
+        return;
+    }
+    
+    emptyState.classList.add('hidden');
+    container.innerHTML = receivedReviews.map(review => createReviewCard(review, 'received')).join('');
+}
+
+function createReviewCard(review, type) {
+    const isGiven = type === 'given';
+    const companyName = isGiven ? review.reviewee_company : 'From: ' + getReviewerName(review);
+    const date = new Date(review.created_at).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+    });
+    
+    const tags = review.selected_tags || [];
+    const positiveTagsSet = new Set([
+        'On-time Delivery', 'Good Quality', 'Clear Communication',
+        'Fast Payment', 'Clear Requirements', 'Professional Behavior'
+    ]);
+    
+    const positiveTags = tags.filter(tag => positiveTagsSet.has(tag));
+    const negativeTags = tags.filter(tag => !positiveTagsSet.has(tag));
+    
+    return `
+        <div class="bg-gray-50 rounded-xl p-6 border border-gray-200 hover:shadow-md transition-shadow">
+            <div class="flex items-start justify-between mb-4">
+                <div>
+                    <h4 class="font-semibold text-gray-900">${companyName}</h4>
+                    <p class="text-sm text-gray-500 mt-1">Transaction: ${review.transaction_id}</p>
+                </div>
+                <div class="text-right">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${isGiven ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}">
+                        ${isGiven ? 'Given' : 'Received'}
+                    </span>
+                    <p class="text-xs text-gray-500 mt-1">${date}</p>
+                </div>
+            </div>
+            
+            <!-- Tags -->
+            <div class="mb-4">
+                ${positiveTags.length > 0 ? `
+                    <div class="flex flex-wrap gap-2 mb-2">
+                        ${positiveTags.map(tag => `
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                </svg>
+                                ${tag}
+                            </span>
+                        `).join('')}
+                    </div>
+                ` : ''}
+                
+                ${negativeTags.length > 0 ? `
+                    <div class="flex flex-wrap gap-2">
+                        ${negativeTags.map(tag => `
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01"/>
+                                </svg>
+                                ${tag}
+                            </span>
+                        `).join('')}
+                    </div>
+                ` : ''}
+            </div>
+            
+            <!-- Comment -->
+            ${review.comment ? `
+                <div class="bg-white rounded-lg p-4 border border-gray-200">
+                    <p class="text-sm text-gray-700 italic">"${review.comment}"</p>
+                </div>
+            ` : ''}
+        </div>
+    `;
+}
+
+function getReviewerName(review) {
+    // For received reviews, we need to get the reviewer's company name
+    // This would ideally come from the API, but for now we'll use a placeholder
+    return review.reviewer_company || 'Trading Partner';
+}
+
+function switchTab(tab) {
+    currentTab = tab;
+    
+    // Update tab buttons
+    document.querySelectorAll('.tab-button').forEach(btn => {
+        btn.classList.remove('border-purple-500', 'text-purple-600', 'bg-purple-50');
+        btn.classList.add('border-transparent', 'text-gray-500');
+    });
+    
+    const activeTab = document.getElementById(tab + 'Tab');
+    activeTab.classList.remove('border-transparent', 'text-gray-500');
+    activeTab.classList.add('border-purple-500', 'text-purple-600', 'bg-purple-50');
+    
+    // Update tab content
+    document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.add('hidden');
+    });
+    
+    document.getElementById(tab + 'Content').classList.remove('hidden');
+    
+    // Render reviews for current tab
+    renderReviews();
+}
+
+function showLoading() {
+    document.getElementById('loadingState').classList.remove('hidden');
+    document.getElementById('mainContent').classList.add('hidden');
+    document.getElementById('errorState').classList.add('hidden');
+}
+
+function showContent() {
+    document.getElementById('loadingState').classList.add('hidden');
+    document.getElementById('mainContent').classList.remove('hidden');
+    document.getElementById('errorState').classList.add('hidden');
+}
+
+function showError() {
+    document.getElementById('loadingState').classList.add('hidden');
+    document.getElementById('mainContent').classList.add('hidden');
+    document.getElementById('errorState').classList.remove('hidden');
+}
+</script>
+
+{% endblock %}

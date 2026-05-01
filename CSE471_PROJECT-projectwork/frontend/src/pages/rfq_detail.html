@@ -1,0 +1,806 @@
+{% extends "base.html" %}
+
+{% block title %}RFQ Details - {{ rfq.title }} - TexBid{% endblock %}
+
+{% block content %}
+<div class="bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen py-12">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        
+        <!-- Header with Actions -->
+        <div class="mb-8">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-4">
+                    <a href="/dashboard?ref=back" class="text-blue-600 hover:text-blue-800 transition-colors">
+                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                        </svg>
+                    </a>
+                    <div>
+                        <h1 class="text-4xl font-bold text-gray-900">{{ rfq.title }}</h1>
+                        <div class="flex items-center gap-4 mt-2">
+                            <p class="text-sm text-gray-500">RFQ ID: {{ rfq.id }}</p>
+                            {% if buyer_company_name %}
+                            <span class="text-gray-400">•</span>
+                            <p class="text-sm text-gray-700 font-semibold">Posted by: <span class="text-blue-600">{{ buyer_company_name }}</span></p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Action Buttons -->
+                {% if is_owner %}
+                <div class="flex flex-wrap gap-3">
+                    <a href="/rfq/{{ rfq.id }}/bids" class="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors shadow-md">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                        Bids on RFQ
+                    </a>
+                    <a href="/rfq/{{ rfq.id }}/edit" class="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-md">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                        </svg>
+                        Edit RFQ
+                    </a>
+                    <button id="delete-rfq-btn" class="inline-flex items-center gap-2 px-5 py-2.5 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-colors shadow-md">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                        Delete RFQ
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- Status Badges -->
+            <div class="flex flex-wrap gap-3">
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold {{ 'bg-green-100 text-green-800' if rfq.status == 'OPEN' else ('bg-yellow-100 text-yellow-800' if rfq.status == 'EVALUATING' else ('bg-blue-100 text-blue-800' if rfq.status == 'AWARDED' else 'bg-gray-100 text-gray-800')) }}">
+                    {{ rfq.status }}
+                </span>
+                
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold {{ 'bg-red-100 text-red-800' if rfq.urgency_level == 'HIGH' else ('bg-orange-100 text-orange-800' if rfq.urgency_level == 'MEDIUM' else 'bg-blue-100 text-blue-800') }}">
+                    {{ rfq.urgency_level }} URGENCY
+                </span>
+                
+                {% if rfq.is_reverse_auction %}
+                <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-bold bg-purple-100 text-purple-800">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    </svg>
+                    REVERSE AUCTION
+                </span>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Main Content Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <!-- Left Column: Main Details -->
+            <div class="lg:col-span-2 space-y-6">
+                
+                <!-- Basic Information -->
+                <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                    <div class="px-6 py-4 bg-gradient-to-r from-blue-50 to-blue-100 border-b border-gray-200">
+                        <h2 class="text-xl font-bold text-gray-900">Basic Information</h2>
+                    </div>
+                    <div class="p-6 space-y-4">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <p class="text-sm font-semibold text-gray-600">Product Category</p>
+                                <p class="text-lg font-bold text-gray-900">{{ rfq.product_category }}</p>
+                            </div>
+                            <div>
+                                <p class="text-sm font-semibold text-gray-600">Total Quantity</p>
+                                <p class="text-lg font-bold text-gray-900">{{ "{:,}".format(rfq.quantity) }} units</p>
+                            </div>
+                            <div>
+                                <p class="text-sm font-semibold text-gray-600">Fabric Type</p>
+                                <p class="text-lg font-bold text-gray-900">{{ rfq.fabric_type }}</p>
+                            </div>
+                            <div>
+                                <p class="text-sm font-semibold text-gray-600">Fabric GSM</p>
+                                <p class="text-lg font-bold text-gray-900">{{ rfq.fabric_gsm or 'Not specified' }}</p>
+                            </div>
+                            {% if rfq.target_price %}
+                            <div>
+                                <p class="text-sm font-semibold text-gray-600">Target Price</p>
+                                <p class="text-lg font-bold text-green-600">${{ "%.2f"|format(rfq.target_price) }} per unit</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quantity Breakdown -->
+                {% if rfq.quantity_breakdown and rfq.quantity_breakdown|length > 0 %}
+                <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                    <div class="px-6 py-4 bg-gradient-to-r from-green-50 to-green-100 border-b border-gray-200">
+                        <h2 class="text-xl font-bold text-gray-900">Quantity Breakdown</h2>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-gray-50 border-b border-gray-200">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Size</th>
+                                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Color</th>
+                                    <th class="px-6 py-3 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">Quantity</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200">
+                                {% for item in rfq.quantity_breakdown %}
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-6 py-4 text-sm font-semibold text-gray-900">{{ item.size }}</td>
+                                    <td class="px-6 py-4 text-sm text-gray-700">{{ item.color }}</td>
+                                    <td class="px-6 py-4 text-sm font-bold text-gray-900 text-right">{{ "{:,}".format(item.quantity) }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Specifications -->
+                <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                    <div class="px-6 py-4 bg-gradient-to-r from-purple-50 to-purple-100 border-b border-gray-200">
+                        <h2 class="text-xl font-bold text-gray-900">Specifications</h2>
+                    </div>
+                    <div class="p-6 space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {% if rfq.bom_buttons %}
+                            <div>
+                                <p class="text-sm font-semibold text-gray-600">Buttons</p>
+                                <p class="text-base text-gray-900">{{ rfq.bom_buttons }}</p>
+                            </div>
+                            {% endif %}
+                            {% if rfq.bom_zippers %}
+                            <div>
+                                <p class="text-sm font-semibold text-gray-600">Zippers</p>
+                                <p class="text-base text-gray-900">{{ rfq.bom_zippers }}</p>
+                            </div>
+                            {% endif %}
+                            {% if rfq.bom_thread %}
+                            <div>
+                                <p class="text-sm font-semibold text-gray-600">Thread</p>
+                                <p class="text-base text-gray-900">{{ rfq.bom_thread }}</p>
+                            </div>
+                            {% endif %}
+                            {% if rfq.packaging_type %}
+                            <div>
+                                <p class="text-sm font-semibold text-gray-600">Packaging</p>
+                                <p class="text-base text-gray-900">{{ rfq.packaging_type }}</p>
+                            </div>
+                            {% endif %}
+                            {% if rfq.measurement_tolerance %}
+                            <div>
+                                <p class="text-sm font-semibold text-gray-600">Measurement Tolerance</p>
+                                <p class="text-base text-gray-900">{{ rfq.measurement_tolerance }}</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        {% if rfq.labeling_reqs and rfq.labeling_reqs|length > 0 %}
+                        <div>
+                            <p class="text-sm font-semibold text-gray-600 mb-2">Labeling Requirements</p>
+                            <div class="flex flex-wrap gap-2">
+                                {% for label in rfq.labeling_reqs %}
+                                <span class="px-3 py-1 bg-purple-100 text-purple-800 text-sm font-semibold rounded-full">{{ label }}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if rfq.pantone_colors and rfq.pantone_colors|length > 0 %}
+                        <div>
+                            <p class="text-sm font-semibold text-gray-600 mb-2">Pantone Colors</p>
+                            <div class="flex flex-wrap gap-2">
+                                {% for color in rfq.pantone_colors %}
+                                <span class="px-3 py-1 bg-gray-100 text-gray-800 text-sm font-mono rounded">{{ color }}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Logistics & Timeline -->
+                <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                    <div class="px-6 py-4 bg-gradient-to-r from-orange-50 to-orange-100 border-b border-gray-200">
+                        <h2 class="text-xl font-bold text-gray-900">Logistics & Timeline</h2>
+                    </div>
+                    <div class="p-6 space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {% if rfq.target_delivery_date %}
+                            <div>
+                                <p class="text-sm font-semibold text-gray-600">Target Delivery Date</p>
+                                <p class="text-lg font-bold text-gray-900">{{ rfq.target_delivery_date }}</p>
+                            </div>
+                            {% endif %}
+                            <div>
+                                <p class="text-sm font-semibold text-gray-600">Incoterms</p>
+                                <p class="text-lg font-bold text-gray-900">{{ rfq.incoterm or rfq.incoterms or 'FOB' }}</p>
+                            </div>
+                            {% if rfq.shipping_method %}
+                            <div>
+                                <p class="text-sm font-semibold text-gray-600">Shipping Method</p>
+                                <p class="text-base text-gray-900">{{ rfq.shipping_method }}</p>
+                            </div>
+                            {% endif %}
+                            {% if rfq.destination_port %}
+                            <div>
+                                <p class="text-sm font-semibold text-gray-600">Destination Port</p>
+                                <p class="text-base text-gray-900">{{ rfq.destination_port }}</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Sample Requirements -->
+                        <div class="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                            <h3 class="text-sm font-bold text-blue-900 mb-3">Sample Requirements</h3>
+                            <div class="space-y-2">
+                                <div class="flex items-center gap-2">
+                                    {% if rfq.proto_sample_req %}
+                                    <svg class="h-5 w-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                    <span class="text-sm text-gray-700">Prototype Sample Required{% if rfq.proto_sample_date %} by {{ rfq.proto_sample_date }}{% endif %}</span>
+                                    {% else %}
+                                    <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                    <span class="text-sm text-gray-500">Prototype Sample Not Required</span>
+                                    {% endif %}
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    {% if rfq.pp_sample_req %}
+                                    <svg class="h-5 w-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                    <span class="text-sm text-gray-700">Pre-Production Sample Required{% if rfq.pp_sample_date %} by {{ rfq.pp_sample_date }}{% endif %}</span>
+                                    {% else %}
+                                    <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                    <span class="text-sm text-gray-500">Pre-Production Sample Not Required</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Reverse Auction Details -->
+                {% if rfq.is_reverse_auction %}
+                <div class="bg-white rounded-lg shadow-md overflow-hidden border-l-4 border-purple-600">
+                    <div class="px-6 py-4 bg-gradient-to-r from-purple-50 to-purple-100 border-b border-gray-200">
+                        <h2 class="text-xl font-bold text-gray-900 flex items-center gap-2">
+                            <svg class="h-6 w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                            </svg>
+                            Reverse Auction Details
+                        </h2>
+                    </div>
+                    <div class="p-6 space-y-4">
+                        {% if rfq.auction_end_time %}
+                        <div>
+                            <p class="text-sm font-semibold text-gray-600">Auction Ends</p>
+                            <p class="text-lg font-bold text-red-600">{{ rfq.auction_end_time }}</p>
+                        </div>
+                        {% endif %}
+                        {% if rfq.current_lowest_bid %}
+                        <div>
+                            <p class="text-sm font-semibold text-gray-600">Current Lowest Bid</p>
+                            <p class="text-2xl font-bold text-green-600">${{ "%.2f"|format(rfq.current_lowest_bid) }} per unit</p>
+                        </div>
+                        {% endif %}
+                        
+                        <!-- Show Join Auction Room button for premium users -->
+                        {% if is_premium %}
+                        <a href="/auction/{{ rfq.id }}" class="inline-flex items-center gap-2 px-5 py-3 bg-purple-600 text-white font-bold rounded-lg hover:bg-purple-700 transition-colors shadow-md w-full justify-center">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                            </svg>
+                            Join Auction Room
+                        </a>
+                        {% else %}
+                        <!-- Show upgrade message for free users -->
+                        <div class="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-4 text-center">
+                            <p class="text-sm font-bold text-yellow-800 mb-2">🔒 Premium Feature</p>
+                            <p class="text-xs text-yellow-700 mb-3">The Auction Room is only accessible to Premium users. Free users can submit bids through the "Submit a Bid" page.</p>
+                            <a href="/pricing" class="inline-flex items-center gap-2 px-4 py-2 bg-yellow-600 text-white font-bold text-sm rounded-lg hover:bg-yellow-700 transition-colors">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/>
+                                </svg>
+                                Upgrade to Premium
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Bids on this RFQ — visible to all logged-in viewers -->
+                {% if bids %}
+                <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                    <div class="px-6 py-4 bg-gradient-to-r from-green-50 to-emerald-100 border-b border-gray-200 flex items-center justify-between">
+                        <h2 class="text-xl font-bold text-gray-900 flex items-center gap-2">
+                            <svg class="h-5 w-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            Bids
+                        </h2>
+                        <span class="text-sm font-bold text-green-700 bg-green-100 px-3 py-1 rounded-full">{{ bids|length }} bid{{ 's' if bids|length != 1 }}</span>
+                    </div>
+                    <div class="divide-y divide-gray-100">
+                        {% for bid in bids %}
+                        <div class="p-5 flex items-center justify-between gap-4 hover:bg-gray-50 transition-colors">
+                            <div class="flex-1 min-w-0">
+                                <p class="font-bold text-gray-900 truncate">
+                                    {{ bid.supplier_name }}
+                                    {% if bid.is_own_bid %}
+                                    <span class="ml-2 text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">Your Bid</span>
+                                    {% endif %}
+                                </p>
+                                <p class="text-xs text-gray-400 mt-0.5 font-mono">{{ bid.supplier_id }}</p>
+                                {% if bid.status == 'ACCEPTED' %}
+                                <span class="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">✓ Accepted</span>
+                                {% elif bid.status == 'CONFIRMED' %}
+                                <span class="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">✓ Confirmed</span>
+                                {% elif bid.status == 'REJECTED' %}
+                                <span class="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-red-100 text-red-600 text-xs font-bold">Rejected</span>
+                                {% endif %}
+                            </div>
+                            <div class="text-right flex-shrink-0">
+                                <p class="text-2xl font-extrabold text-green-700">
+                                    ৳ {{ "{:,.2f}".format(bid.bid_price * rfq.quantity) }}
+                                </p>
+                                <p class="text-xs text-gray-500">৳ {{ "{:,.2f}".format(bid.bid_price) }} / unit × {{ "{:,}".format(rfq.quantity) }}</p>
+                            </div>
+                            {% if bid.already_paid %}
+                            <!-- Paid -->
+                            <div class="flex-shrink-0 flex flex-col gap-2 items-end">
+                              <span class="inline-flex items-center gap-2 px-4 py-2.5 bg-green-100 text-green-700 font-bold text-sm rounded-xl">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+                                </svg>
+                                Paid – In Escrow
+                              </span>
+                            </div>
+                            {% elif bid.contract_id and bid.contract_status == 'FULLY_EXECUTED' and is_owner and bid.status == 'CONFIRMED' and not bid.already_paid %}
+                            <!-- Contract fully signed and bid confirmed — buyer can pay -->
+                            <div class="flex-shrink-0 flex flex-col gap-2 items-end">
+                              <span class="inline-flex items-center gap-2 px-3 py-1.5 bg-green-50 text-green-700 font-semibold text-xs rounded-lg mb-1">
+                                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                Contract Signed ✓
+                              </span>
+                              <a href="/payment/gateway?rfq_id={{ rfq.id }}&bid_id={{ bid.id }}"
+                                  class="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-xl shadow transition-colors">
+                                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                          d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+                                  </svg>
+                                  Pay Now
+                              </a>
+                            </div>
+                            {% elif bid.already_paid and is_owner %}
+                            <!-- Payment already made -->
+                            <div class="flex-shrink-0 flex flex-col gap-2 items-end">
+                              <span class="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 font-semibold text-xs rounded-lg">
+                                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                Payment Completed ✓
+                              </span>
+                              <a href="/escrow/tracker" class="text-xs text-blue-600 hover:text-blue-800 font-semibold">View Escrow Status →</a>
+                            </div>
+                            {% elif bid.contract_id and bid.contract_status != 'FULLY_EXECUTED' %}
+                            <!-- Contract exists but not fully signed -->
+                            <div class="flex-shrink-0 flex flex-col gap-2 items-end">
+                              <a href="/contracts/{{ bid.contract_id }}"
+                                  class="inline-flex items-center gap-2 px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-sm rounded-xl shadow transition-colors">
+                                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                  </svg>
+                                  Sign Contract 📝
+                              </a>
+                              <span class="text-xs text-amber-600 font-semibold">Awaiting signatures</span>
+                            </div>
+                            {% elif bid.status == 'CONFIRMED' and is_owner and not bid.contract_id %}
+                            <!-- Bid confirmed by supplier — buyer needs to generate contract -->
+                            <div class="flex-shrink-0 flex flex-col gap-2 items-end">
+                              <span class="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-700 font-semibold text-xs rounded-lg mb-1">
+                                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                Supplier Confirmed ✓
+                              </span>
+                              <button onclick="generateContract('{{ rfq.id }}', '{{ bid.id }}')"
+                                class="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl shadow transition-colors">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                </svg>
+                                Generate Contract 📄
+                              </button>
+                              <span class="text-xs text-indigo-600 font-semibold">Required before payment</span>
+                            </div>
+                            {% elif bid.status == 'ACCEPTED' and is_owner %}
+                            <!-- Bid accepted by buyer — waiting for supplier to confirm -->
+                            <div class="flex-shrink-0 flex flex-col gap-2 items-end">
+                              <span class="inline-flex items-center gap-2 px-3 py-1.5 bg-yellow-50 text-yellow-700 font-semibold text-xs rounded-lg">
+                                <span class="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></span>
+                                Awaiting Supplier Confirmation
+                              </span>
+                            </div>
+                            {% elif bid.status == 'CONFIRMED' and not is_owner and bid.contract_id %}
+                            <!-- Supplier view: bid confirmed, contract exists -->
+                            <div class="flex-shrink-0 flex flex-col gap-2 items-end">
+                              <a href="/contracts/{{ bid.contract_id }}"
+                                  class="inline-flex items-center gap-2 px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-sm rounded-xl shadow transition-colors">
+                                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                  </svg>
+                                  {% if bid.contract_status == 'FULLY_EXECUTED' %}
+                                  View Contract 📄
+                                  {% else %}
+                                  Sign Contract 📝
+                                  {% endif %}
+                              </a>
+                              {% if bid.contract_status != 'FULLY_EXECUTED' %}
+                              <span class="text-xs text-amber-600 font-semibold">Please sign the contract</span>
+                              {% endif %}
+                            </div>
+                            {% elif bid.status == 'ACCEPTED' and not is_owner %}
+                            <!-- Supplier view: bid accepted, needs to confirm -->
+                            <div class="flex-shrink-0 flex flex-col gap-2 items-end">
+                              <button onclick="confirmBid('{{ bid.id }}', '{{ rfq.id }}')"
+                                class="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow transition-colors">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                Confirm Order
+                              </button>
+                              <span class="text-xs text-emerald-600 font-semibold">Buyer accepted your bid</span>
+                            </div>
+                            {% elif bid.is_own_bid and bid.status not in ('ACCEPTED', 'CONFIRMED', 'REJECTED') %}
+                            <!-- Supplier viewing their own pending bid -->
+                            <span class="flex-shrink-0 text-xs text-gray-400 italic px-3">Your bid — awaiting response</span>
+                            {% elif bid.status not in ('REJECTED',) and not bid.is_own_bid and is_owner %}
+                            <!-- Show Accept button only to RFQ owner -->
+                            <button onclick="acceptBid('{{ bid.id }}', '{{ rfq.id }}')"
+                                class="flex-shrink-0 inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow transition-colors">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                Accept Bid
+                            </button>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+            </div>
+
+            <!-- Right Column: Sidebar -->
+            <div class="space-y-6">
+                
+                <!-- Certifications Required -->
+                {% if rfq.certifications_required and rfq.certifications_required|length > 0 %}
+                <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                    <div class="px-6 py-4 bg-gradient-to-r from-teal-50 to-teal-100 border-b border-gray-200">
+                        <h2 class="text-lg font-bold text-gray-900">Required Certifications</h2>
+                    </div>
+                    <div class="p-6">
+                        <div class="space-y-2">
+                            {% for cert in rfq.certifications_required %}
+                            <div class="flex items-center gap-2 p-3 bg-teal-50 rounded-lg border border-teal-200">
+                                <svg class="h-5 w-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                                </svg>
+                                <span class="text-sm font-semibold text-teal-900">{{ cert }}</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Shipping Calculator -->
+                <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                    <div class="px-6 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
+                        <h2 class="text-lg font-bold text-gray-900 flex items-center gap-2">
+                            <svg class="h-5 w-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                            </svg>
+                            Shipping Estimate
+                        </h2>
+                    </div>
+                    <div class="p-5">
+                        <p class="text-sm text-gray-600 mb-4">Calculate estimated shipping costs and understand Incoterm responsibilities for this order.</p>
+                        <button
+                            onclick="openShippingCalculator('{{ rfq.id }}', '{{ rfq.destination_port or '' }}', {{ rfq.quantity or 0 }}, '{{ rfq.title | replace("'", "") }}', '{{ rfq.shipping_method or 'SEA' }}', '{{ rfq.incoterm or rfq.incoterms or 'FOB' }}')"
+                            class="w-full inline-flex items-center justify-center gap-2 px-5 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors shadow-md">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                            </svg>
+                            Calculate Shipping
+                        </button>
+                        {% if rfq.incoterm or rfq.incoterms %}
+                        <p class="text-xs text-gray-400 mt-2 text-center">RFQ Incoterm: <span class="font-bold text-gray-600">{{ rfq.incoterm or rfq.incoterms }}</span></p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Timeline -->
+                <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                    <div class="px-6 py-4 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+                        <h2 class="text-lg font-bold text-gray-900">Timeline</h2>
+                    </div>
+                    <div class="p-6 space-y-3">
+                        <div class="flex items-start gap-3">
+                            <div class="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                                <svg class="h-4 w-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="text-sm font-semibold text-gray-900">RFQ Created</p>
+                                <p class="text-xs text-gray-500">{{ rfq.created_at.strftime('%B %d, %Y at %I:%M %p') if rfq.created_at else 'N/A' }}</p>
+                            </div>
+                        </div>
+                        {% if rfq.deadline %}
+                        <div class="flex items-start gap-3">
+                            <div class="flex-shrink-0 w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
+                                <svg class="h-4 w-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="text-sm font-semibold text-gray-900">Bid Deadline</p>
+                                <p class="text-xs text-gray-500">{{ rfq.deadline }}</p>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+
+            </div>
+
+        </div>
+
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div id="delete-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg shadow-2xl max-w-md w-full p-6">
+        <div class="flex items-center gap-3 mb-4">
+            <div class="flex-shrink-0 w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                <svg class="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                </svg>
+            </div>
+            <div>
+                <h3 class="text-lg font-bold text-gray-900">Delete RFQ</h3>
+                <p class="text-sm text-gray-600">This action cannot be undone</p>
+            </div>
+        </div>
+        <p class="text-gray-700 mb-6">Are you sure you want to delete this RFQ? All associated bids and data will be permanently removed.</p>
+        <div class="flex gap-3">
+            <button id="cancel-delete" class="flex-1 px-4 py-2 bg-gray-200 text-gray-800 font-semibold rounded-lg hover:bg-gray-300 transition-colors">
+                Cancel
+            </button>
+            <button id="confirm-delete" class="flex-1 px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-colors">
+                Delete RFQ
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Delete RFQ functionality
+    const deleteBtn = document.getElementById('delete-rfq-btn');
+    const deleteModal = document.getElementById('delete-modal');
+    const cancelBtn = document.getElementById('cancel-delete');
+    const confirmBtn = document.getElementById('confirm-delete');
+    
+    if (deleteBtn) {
+        deleteBtn.addEventListener('click', () => {
+            deleteModal.classList.remove('hidden');
+        });
+    }
+    
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', () => {
+            deleteModal.classList.add('hidden');
+        });
+    }
+    
+    if (confirmBtn) {
+        confirmBtn.addEventListener('click', async () => {
+            try {
+                const response = await fetch('/api/rfq/{{ rfq.id }}', {
+                    method: 'DELETE'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('RFQ deleted successfully');
+                    window.location.href = '/dashboard';
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to delete RFQ'));
+                }
+            } catch (error) {
+                console.error('Error deleting RFQ:', error);
+                alert('Failed to delete RFQ. Please try again.');
+            }
+        });
+    }
+    
+    deleteModal.addEventListener('click', (e) => {
+        if (e.target === deleteModal) {
+            deleteModal.classList.add('hidden');
+        }
+    });
+</script>
+
+<script>
+async function acceptBid(bidId, rfqId) {
+    if (!confirm('Accept this bid? The other party will be notified and must confirm before payment.')) return;
+    const btn = event.currentTarget;
+    btn.disabled = true;
+    btn.textContent = 'Accepting…';
+    try {
+        const res = await fetch('/api/bid/accept', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bid_id: bidId, rfq_id: rfqId })
+        });
+        const data = await res.json();
+        if (data.success) {
+            window.location.reload();
+        } else {
+            alert(data.detail || 'Failed to accept bid.');
+            btn.disabled = false;
+            btn.textContent = 'Accept Bid';
+        }
+    } catch(e) {
+        alert('Network error. Please try again.');
+        btn.disabled = false;
+        btn.textContent = 'Accept Bid';
+    }
+}
+
+async function confirmBid(bidId, rfqId) {
+    if (!confirm('Confirm this order? This indicates you can fulfill the requirements and will proceed to contract signing.')) return;
+    const btn = event.currentTarget;
+    btn.disabled = true;
+    btn.textContent = 'Confirming…';
+    try {
+        const res = await fetch('/api/bid/confirm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bid_id: bidId, rfq_id: rfqId })
+        });
+        const data = await res.json();
+        if (data.success) {
+            alert('Order confirmed successfully! The buyer will be notified and can now generate the contract.');
+            window.location.reload();
+        } else {
+            alert(data.detail || 'Failed to confirm order.');
+            btn.disabled = false;
+            btn.textContent = 'Confirm Order';
+        }
+    } catch(e) {
+        alert('Network error. Please try again.');
+        btn.disabled = false;
+        btn.textContent = 'Confirm Order';
+    }
+}
+
+async function generateContract(rfqId, bidId) {
+    const btn = event.currentTarget;
+    btn.disabled = true;
+    btn.textContent = 'Generating…';
+    try {
+        const res = await fetch('/api/contracts/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rfq_id: rfqId, bid_id: bidId })
+        });
+        const data = await res.json();
+        if (data.success) {
+            window.location.href = '/contracts/' + data.contract_id;
+        } else {
+            alert(data.detail || 'Failed to generate contract.');
+            btn.disabled = false;
+            btn.textContent = 'Generate Contract 📄';
+        }
+    } catch(e) {
+        alert('Network error. Please try again.');
+        btn.disabled = false;
+        btn.textContent = 'Generate Contract 📄';
+    }
+}
+
+// Supplier bid submission functionality
+document.addEventListener('DOMContentLoaded', () => {
+    const priceInput = document.getElementById('supplier-bid-price');
+    const totalDisplay = document.getElementById('supplier-bid-total');
+    const submitBtn = document.getElementById('submit-supplier-bid-btn');
+    const successMsg = document.getElementById('supplier-bid-success');
+    const errorMsg = document.getElementById('supplier-bid-error');
+    const errorText = document.getElementById('supplier-bid-error-msg');
+    
+    if (priceInput && totalDisplay) {
+        const rfqQuantity = {{ rfq.quantity }};
+        
+        // Update total when price changes
+        priceInput.addEventListener('input', () => {
+            const price = parseFloat(priceInput.value) || 0;
+            const total = price * rfqQuantity;
+            totalDisplay.textContent = '৳ ' + total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        });
+    }
+    
+    if (submitBtn) {
+        submitBtn.addEventListener('click', async () => {
+            const price = parseFloat(priceInput.value);
+            
+            if (successMsg) successMsg.classList.add('hidden');
+            if (errorMsg) errorMsg.classList.add('hidden');
+            
+            if (!price || price <= 0) {
+                if (errorText) errorText.textContent = 'Please enter a valid bid price.';
+                if (errorMsg) errorMsg.classList.remove('hidden');
+                return;
+            }
+            
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<svg class="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Submitting…';
+            
+            try {
+                const res = await fetch('/api/bid/submit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        rfq_id: '{{ rfq.id }}', 
+                        bid_price: price 
+                    })
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    if (successMsg) successMsg.classList.remove('hidden');
+                    priceInput.value = '';
+                    if (totalDisplay) totalDisplay.textContent = '৳ 0.00';
+                    
+                    // Reload page after 2 seconds to show the new bid
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 2000);
+                } else {
+                    if (errorText) errorText.textContent = data.detail || 'Failed to submit bid.';
+                    if (errorMsg) errorMsg.classList.remove('hidden');
+                }
+            } catch(e) {
+                if (errorText) errorText.textContent = 'Network error. Please try again.';
+                if (errorMsg) errorMsg.classList.remove('hidden');
+            }
+            
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> Submit Bid';
+        });
+    }
+});
+</script>
+
+{% include "shipping_calculator_modal.html" %}
+
+{% endblock %}
