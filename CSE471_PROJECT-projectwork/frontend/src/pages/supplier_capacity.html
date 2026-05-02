@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+{% block title %}Manage Capacity – TexBid{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-[#f8f9fb]">
+
+  <!-- Header -->
+  <div class="border-b border-[#E5E7EB] bg-white">
+    <div class="max-w-[860px] mx-auto px-4 sm:px-6 pt-6 pb-5">
+      <div class="flex items-center gap-2 text-sm text-slate-400 mb-3">
+        <a href="/dashboard/supplier" class="hover:text-slate-700 transition">Dashboard</a>
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+        <span class="font-semibold text-slate-800">Factory Capacity</span>
+      </div>
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <h1 class="text-2xl font-bold text-slate-900">Factory Capacity Management</h1>
+          <p class="text-sm text-slate-500 mt-1">Declare your production capacity so buyers can check availability before placing orders.</p>
+        </div>
+        <div id="statusBadge" class="hidden shrink-0 mt-1"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="max-w-[860px] mx-auto px-4 sm:px-6 py-8 space-y-6">
+
+    <!-- Current Capacity Card -->
+    <div class="bg-white rounded-xl border border-[#E5E7EB] p-6">
+      <div class="flex items-center gap-3 mb-5">
+        <div class="w-9 h-9 rounded-xl bg-[#c29c69]/10 flex items-center justify-center">
+          <svg class="w-5 h-5 text-[#c29c69]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+        </div>
+        <div>
+          <h2 class="text-base font-bold text-slate-800">Current Capacity Status</h2>
+          <p class="text-xs text-slate-400" id="lastUpdatedText">Loading...</p>
+        </div>
+      </div>
+
+      <!-- Capacity Bar -->
+      <div id="capacityDisplay" class="hidden">
+        <div class="grid grid-cols-3 gap-4 mb-5">
+          <div class="bg-slate-50 rounded-xl border border-[#E5E7EB] p-4 text-center">
+            <p class="text-2xl font-extrabold text-slate-800" id="displayTotal">—</p>
+            <p class="text-xs font-bold text-slate-400 uppercase mt-1">Total Capacity</p>
+            <p class="text-xs text-slate-400">units / month</p>
+          </div>
+          <div class="bg-slate-50 rounded-xl border border-[#E5E7EB] p-4 text-center">
+            <p class="text-2xl font-extrabold text-green-600" id="displayAvailable">—</p>
+            <p class="text-xs font-bold text-slate-400 uppercase mt-1">Available</p>
+            <p class="text-xs text-slate-400">units / month</p>
+          </div>
+          <div class="bg-slate-50 rounded-xl border border-[#E5E7EB] p-4 text-center">
+            <p class="text-2xl font-extrabold text-blue-600" id="displayUtilization">—</p>
+            <p class="text-xs font-bold text-slate-400 uppercase mt-1">Utilization</p>
+            <p class="text-xs text-slate-400">% booked</p>
+          </div>
+        </div>
+        <!-- Progress bar -->
+        <div class="mb-2 flex justify-between text-xs text-slate-500">
+          <span>Available</span>
+          <span id="barLabel">0% utilized</span>
+        </div>
+        <div class="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+          <div id="capacityBar" class="h-3 rounded-full transition-all duration-500 bg-green-500" style="width:0%"></div>
+        </div>
+        <div class="flex justify-between text-xs text-slate-400 mt-1">
+          <span>0</span>
+          <span id="barMax">0 units</span>
+        </div>
+      </div>
+
+      <div id="noCapacityMsg" class="py-6 text-center">
+        <svg class="w-12 h-12 text-slate-200 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+        <p class="text-sm font-medium text-slate-500">No capacity declared yet.</p>
+        <p class="text-xs text-slate-400 mt-1">Use the form below to set your production capacity.</p>
+      </div>
+    </div>
+
+    <!-- Update Form -->
+    <div class="bg-white rounded-xl border border-[#E5E7EB] overflow-hidden">
+      <div class="px-6 py-4 border-b border-[#E5E7EB] flex items-center gap-3">
+        <span class="w-7 h-7 rounded-lg bg-[#1b4478] text-white flex items-center justify-center text-xs font-bold">✎</span>
+        <div>
+          <h2 class="text-sm font-bold text-slate-800">Update Capacity</h2>
+          <p class="text-xs text-slate-400">Set your total and currently available production capacity</p>
+        </div>
+      </div>
+      <div class="p-6">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
+          <!-- Total Capacity -->
+          <div>
+            <label class="block text-sm font-semibold text-slate-700 mb-1.5">
+              Total Monthly Capacity <span class="text-red-400">*</span>
+            </label>
+            <div class="relative">
+              <input type="number" id="totalCapacityInput" min="1" placeholder="e.g. 50000"
+                class="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[#1b4478] focus:ring-2 focus:ring-[#1b4478]/10 transition pr-20">
+              <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-medium">units/mo</span>
+            </div>
+            <p class="text-xs text-slate-400 mt-1">Maximum units your factory can produce per month at full capacity.</p>
+          </div>
+          <!-- Available Capacity -->
+          <div>
+            <label class="block text-sm font-semibold text-slate-700 mb-1.5">
+              Currently Available <span class="text-red-400">*</span>
+            </label>
+            <div class="relative">
+              <input type="number" id="availableCapacityInput" min="0" placeholder="e.g. 30000"
+                class="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[#1b4478] focus:ring-2 focus:ring-[#1b4478]/10 transition pr-20">
+              <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-medium">units/mo</span>
+            </div>
+            <p class="text-xs text-slate-400 mt-1">Units available for new orders this month (must be ≤ total).</p>
+          </div>
+        </div>
+
+        <!-- Live preview bar -->
+        <div id="previewSection" class="hidden mb-6 bg-slate-50 rounded-xl border border-[#E5E7EB] p-4">
+          <p class="text-xs font-bold text-slate-500 uppercase mb-3">Preview</p>
+          <div class="flex justify-between text-xs text-slate-500 mb-1">
+            <span id="previewAvailLabel">Available: 0</span>
+            <span id="previewUtilLabel">0% utilized</span>
+          </div>
+          <div class="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
+            <div id="previewBar" class="h-2.5 rounded-full transition-all duration-300 bg-green-500" style="width:0%"></div>
+          </div>
+        </div>
+
+        <div id="formError" class="hidden mb-4 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700 font-medium"></div>
+
+        <button id="saveBtn" onclick="saveCapacity()"
+          class="w-full sm:w-auto px-8 py-3 bg-[#1b4478] text-white font-bold text-sm rounded-lg hover:bg-[#143560] transition flex items-center justify-center gap-2 shadow-md shadow-[#1b4478]/20">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+          Save Capacity
+        </button>
+      </div>
+    </div>
+
+    <!-- Info Box -->
+    <div class="bg-blue-50 border border-blue-200 rounded-xl p-5">
+      <div class="flex items-start gap-3">
+        <svg class="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <div class="text-sm text-blue-800">
+          <p class="font-bold mb-1">How capacity works</p>
+          <ul class="space-y-1 text-xs text-blue-700 list-disc list-inside">
+            <li>Buyers see your available capacity before placing orders.</li>
+            <li>When you confirm an order, available capacity is automatically deducted.</li>
+            <li>If an order is cancelled or disputed, capacity is restored automatically.</li>
+            <li>Keep this updated to avoid overbooking and buyer disputes.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const SUPPLIER_ID = "{{ user.company_id if user else '' }}";
+
+async function loadCapacity() {
+  try {
+    const res = await fetch('/capacity/' + SUPPLIER_ID);
+    const data = await res.json();
+    if (data.has_data) {
+      showCapacity(data);
+    } else {
+      document.getElementById('noCapacityMsg').classList.remove('hidden');
+      document.getElementById('capacityDisplay').classList.add('hidden');
+      document.getElementById('lastUpdatedText').textContent = 'Not set yet';
+    }
+  } catch(e) {
+    document.getElementById('lastUpdatedText').textContent = 'Could not load capacity data';
+  }
+}
+
+function showCapacity(data) {
+  document.getElementById('noCapacityMsg').classList.add('hidden');
+  document.getElementById('capacityDisplay').classList.remove('hidden');
+  document.getElementById('displayTotal').textContent = (data.total_capacity || 0).toLocaleString();
+  document.getElementById('displayAvailable').textContent = (data.available_capacity || 0).toLocaleString();
+  document.getElementById('displayUtilization').textContent = (data.utilization_pct || 0) + '%';
+  document.getElementById('barMax').textContent = (data.total_capacity || 0).toLocaleString() + ' units';
+  document.getElementById('barLabel').textContent = (data.utilization_pct || 0) + '% utilized';
+  const bar = document.getElementById('capacityBar');
+  bar.style.width = (data.utilization_pct || 0) + '%';
+  bar.className = 'h-3 rounded-full transition-all duration-500 ' + (
+    data.utilization_pct >= 90 ? 'bg-red-500' :
+    data.utilization_pct >= 60 ? 'bg-amber-500' : 'bg-green-500'
+  );
+  const lu = data.last_updated ? new Date(data.last_updated).toLocaleString() : 'Unknown';
+  document.getElementById('lastUpdatedText').textContent = 'Last updated: ' + lu;
+  // Pre-fill form
+  document.getElementById('totalCapacityInput').value = data.total_capacity || '';
+  document.getElementById('availableCapacityInput').value = data.available_capacity || '';
+  updatePreview();
+}
+
+function updatePreview() {
+  const total = parseInt(document.getElementById('totalCapacityInput').value) || 0;
+  const avail = parseInt(document.getElementById('availableCapacityInput').value) || 0;
+  if (total <= 0) { document.getElementById('previewSection').classList.add('hidden'); return; }
+  document.getElementById('previewSection').classList.remove('hidden');
+  const used = total - avail;
+  const pct = Math.round((used / total) * 100);
+  document.getElementById('previewAvailLabel').textContent = 'Available: ' + avail.toLocaleString() + ' / ' + total.toLocaleString();
+  document.getElementById('previewUtilLabel').textContent = pct + '% utilized';
+  const bar = document.getElementById('previewBar');
+  bar.style.width = pct + '%';
+  bar.className = 'h-2.5 rounded-full transition-all duration-300 ' + (pct >= 90 ? 'bg-red-500' : pct >= 60 ? 'bg-amber-500' : 'bg-green-500');
+}
+
+document.getElementById('totalCapacityInput').addEventListener('input', updatePreview);
+document.getElementById('availableCapacityInput').addEventListener('input', updatePreview);
+
+async function saveCapacity() {
+  const total = parseInt(document.getElementById('totalCapacityInput').value);
+  const avail = parseInt(document.getElementById('availableCapacityInput').value);
+  const errEl = document.getElementById('formError');
+  errEl.classList.add('hidden');
+
+  if (!total || total <= 0) { errEl.textContent = 'Total capacity must be greater than 0.'; errEl.classList.remove('hidden'); return; }
+  if (avail === undefined || avail < 0) { errEl.textContent = 'Available capacity cannot be negative.'; errEl.classList.remove('hidden'); return; }
+  if (avail > total) { errEl.textContent = 'Available capacity cannot exceed total capacity.'; errEl.classList.remove('hidden'); return; }
+
+  const btn = document.getElementById('saveBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Saving...';
+
+  try {
+    const res = await fetch('/capacity/update', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ total_capacity: total, available_capacity: avail })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('Capacity updated successfully!', 'success');
+      loadCapacity();
+    } else {
+      errEl.textContent = data.detail || 'Failed to update capacity.';
+      errEl.classList.remove('hidden');
+    }
+  } catch(e) {
+    errEl.textContent = 'Network error. Please try again.';
+    errEl.classList.remove('hidden');
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Save Capacity';
+}
+
+function showToast(msg, type) {
+  const t = document.createElement('div');
+  t.className = 'fixed top-6 right-6 z-50 px-5 py-3 rounded-xl shadow-2xl text-sm font-bold flex items-center gap-2 ' +
+    (type === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white');
+  t.innerHTML = (type === 'success'
+    ? '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>'
+    : '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>') + msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 4000);
+}
+
+document.addEventListener('DOMContentLoaded', loadCapacity);
+</script>
+{% endblock %}

@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pricing Plans - TexBid</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="bg-gradient-to-br from-slate-50 to-slate-100">
+    <!-- Header -->
+    <nav class="bg-white shadow-md border-b-4 border-blue-600">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+            <div>
+                <h1 class="text-2xl font-bold text-blue-700">TexBid Pricing</h1>
+                <p class="text-sm text-gray-600">Choose the plan that fits your business</p>
+            </div>
+            <a href="/" class="text-blue-600 hover:text-blue-800 font-semibold">← Back to Home</a>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <!-- Personalized Message for Logged-in Users -->
+        {% if user and company %}
+        <div class="max-w-3xl mx-auto mb-8">
+            <div class="bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-200 rounded-2xl p-6 text-center shadow-lg">
+                <h3 class="text-2xl font-bold text-gray-900 mb-2">
+                    Hey {{ company.get('name', user.email.split('@')[0]) }}! 👋
+                </h3>
+                <p class="text-lg text-gray-700">
+                    You are currently on the <span class="font-bold text-blue-600">{{ company.get('subscription_tier', 'FREE') }}</span> plan.
+                    {% if company.get('subscription_tier') == 'FREE' %}
+                    Option for premium plan is shown below!
+                    {% else %}
+                    Enjoy all premium features! 🎉
+                    {% endif %}
+                </p>
+                {% if subscription_expires and days_until_expiration > 0 %}
+                <div class="mt-4 bg-white rounded-lg p-3 border-2 border-orange-300">
+                    <p class="text-sm font-semibold text-orange-700">
+                        ⏰ Your PREMIUM subscription expires in <span class="text-xl font-bold">{{ days_until_expiration }}</span> day{{ 's' if days_until_expiration != 1 else '' }}
+                    </p>
+                    <p class="text-xs text-gray-600 mt-1">After expiration, you'll be automatically downgraded to FREE plan</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Pricing Header -->
+        <div class="text-center mb-12">
+            <h2 class="text-4xl font-bold text-gray-900 mb-4">
+                {% if user and company and company.get('subscription_tier') == 'PREMIUM' %}
+                Your Premium Subscription
+                {% else %}
+                Upgrade to Premium
+                {% endif %}
+            </h2>
+            <p class="text-xl text-gray-600">
+                {% if user and company and company.get('subscription_tier') == 'PREMIUM' %}
+                You have access to all premium features
+                {% else %}
+                Unlock powerful features for your business
+                {% endif %}
+            </p>
+        </div>
+
+        <!-- Pricing Cards -->
+        <div class="grid grid-cols-1 gap-8 max-w-2xl mx-auto">
+            <!-- PREMIUM Plan -->
+            <div class="bg-white rounded-2xl shadow-2xl overflow-hidden border-4 border-blue-500 relative transform hover:scale-105 transition-all">
+                <!-- Popular Badge -->
+                <div class="absolute top-0 right-0 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-1 text-sm font-bold rounded-bl-lg">
+                    MOST POPULAR
+                </div>
+                
+                <div class="bg-gradient-to-r from-blue-600 to-blue-700 px-8 py-6">
+                    <h3 class="text-2xl font-bold text-white">Premium Plan</h3>
+                    <div class="mt-4">
+                        <span class="text-5xl font-bold text-white">$99</span>
+                        <span class="text-blue-100 text-lg">/month</span>
+                    </div>
+                    <p class="text-blue-100 mt-2">For growing businesses</p>
+                </div>
+                
+                <div class="px-8 py-8">
+                    <ul class="space-y-4">
+                        <li class="flex items-start">
+                            <svg class="w-6 h-6 text-green-500 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span class="text-gray-700 font-semibold">Everything in Free, plus:</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-6 h-6 text-blue-600 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                            </svg>
+                            <span class="text-gray-700"><strong>Reverse Auction</strong> - Real-time competitive bidding</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-6 h-6 text-blue-600 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                            </svg>
+                            <span class="text-gray-700"><strong>AI-Based Recommendations</strong> - Smart supplier matching</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-6 h-6 text-blue-600 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                            </svg>
+                            <span class="text-gray-700"><strong>Order Analytics</strong> - Advanced insights & reports</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-6 h-6 text-blue-600 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            <span class="text-gray-700"><strong>Automated Contracts</strong> - One-click generation</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-6 h-6 text-blue-600 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span class="text-gray-700">Priority Support (24/7)</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-6 h-6 text-blue-600 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span class="text-gray-700">Unlimited RFQs & Auctions</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-6 h-6 text-blue-600 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span class="text-gray-700">Custom Branding Options</span>
+                        </li>
+                    </ul>
+                    
+                    {% if not user %}
+                        <!-- Not logged in -->
+                        <a href="/login" class="w-full mt-8 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold py-3 px-6 rounded-lg transition-all shadow-lg hover:shadow-xl block text-center">
+                            Log In to Upgrade
+                        </a>
+                    {% elif subscription_locked %}
+                        <!-- Subscription locked -->
+                        <button disabled class="w-full mt-8 bg-gray-400 text-white font-bold py-3 px-6 rounded-lg cursor-not-allowed opacity-60">
+                            Locked ({{ days_until_change }} days left)
+                        </button>
+                    {% elif company and company.get('subscription_tier') == 'PREMIUM' %}
+                        <!-- Current PREMIUM plan -->
+                        <button onclick="showCurrentPlanMessage('{{ company.get('name', 'User') }}')" class="w-full mt-8 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold py-3 px-6 rounded-lg transition-all shadow-lg hover:shadow-xl cursor-pointer">
+                            Current Plan
+                        </button>
+                    {% else %}
+                        <!-- Can upgrade to PREMIUM -->
+                        <button onclick="showPaymentOptions('{{ company.get('name', 'User') if company else 'User' }}')" class="w-full mt-8 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold py-3 px-6 rounded-lg transition-all shadow-lg hover:shadow-xl">
+                            Upgrade to Premium
+                        </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Feature Comparison Table -->
+        <div class="mt-16 bg-white rounded-2xl shadow-lg overflow-hidden">
+            <div class="bg-gradient-to-r from-blue-600 to-blue-700 px-8 py-6">
+                <h3 class="text-2xl font-bold text-white">Detailed Feature Comparison</h3>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead>
+                        <tr class="bg-gray-50 border-b-2 border-gray-200">
+                            <th class="px-6 py-4 text-left font-bold text-gray-900">Feature</th>
+                            <th class="px-6 py-4 text-center font-bold text-gray-900">Free</th>
+                            <th class="px-6 py-4 text-center font-bold text-blue-700">Premium</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 font-semibold text-gray-900">RFQ Creation</td>
+                            <td class="px-6 py-4 text-center">
+                                <span class="text-green-600 font-bold">✓</span>
+                            </td>
+                            <td class="px-6 py-4 text-center">
+                                <span class="text-green-600 font-bold">✓</span>
+                            </td>
+                        </tr>
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 font-semibold text-gray-900">Supplier Directory</td>
+                            <td class="px-6 py-4 text-center">
+                                <span class="text-green-600 font-bold">✓</span>
+                            </td>
+                            <td class="px-6 py-4 text-center">
+                                <span class="text-green-600 font-bold">✓</span>
+                            </td>
+                        </tr>
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 font-semibold text-gray-900">Quote Management</td>
+                            <td class="px-6 py-4 text-center">
+                                <span class="text-green-600 font-bold">✓</span>
+                            </td>
+                            <td class="px-6 py-4 text-center">
+                                <span class="text-green-600 font-bold">✓</span>
+                            </td>
+                        </tr>
+                        <tr class="hover:bg-gray-50 bg-blue-50">
+                            <td class="px-6 py-4 font-semibold text-gray-900">
+                                <span class="flex items-center">
+                                    Reverse Auction
+                                    <span class="ml-2 bg-blue-600 text-white text-xs px-2 py-1 rounded-full">PREMIUM</span>
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 text-center">
+                                <span class="text-red-600 font-bold">✗</span>
+                            </td>
+                            <td class="px-6 py-4 text-center">
+                                <span class="text-green-600 font-bold">✓</span>
+                            </td>
+                        </tr>
+                        <tr class="hover:bg-gray-50 bg-blue-50">
+                            <td class="px-6 py-4 font-semibold text-gray-900">
+                                <span class="flex items-center">
+                                    AI Recommendations
+                                    <span class="ml-2 bg-blue-600 text-white text-xs px-2 py-1 rounded-full">PREMIUM</span>
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 text-center">
+                                <span class="text-red-600 font-bold">✗</span>
+                            </td>
+                            <td class="px-6 py-4 text-center">
+                                <span class="text-green-600 font-bold">✓</span>
+                            </td>
+                        </tr>
+                        <tr class="hover:bg-gray-50 bg-blue-50">
+                            <td class="px-6 py-4 font-semibold text-gray-900">
+                                <span class="flex items-center">
+                                    Order Analytics
+                                    <span class="ml-2 bg-blue-600 text-white text-xs px-2 py-1 rounded-full">PREMIUM</span>
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 text-center">
+                                <span class="text-red-600 font-bold">✗</span>
+                            </td>
+                            <td class="px-6 py-4 text-center">
+                                <span class="text-green-600 font-bold">✓</span>
+                            </td>
+                        </tr>
+                        <tr class="hover:bg-gray-50 bg-blue-50">
+                            <td class="px-6 py-4 font-semibold text-gray-900">
+                                <span class="flex items-center">
+                                    Automated Contracts
+                                    <span class="ml-2 bg-blue-600 text-white text-xs px-2 py-1 rounded-full">PREMIUM</span>
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 text-center">
+                                <span class="text-red-600 font-bold">✗</span>
+                            </td>
+                            <td class="px-6 py-4 text-center">
+                                <span class="text-green-600 font-bold">✓</span>
+                            </td>
+                        </tr>
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 font-semibold text-gray-900">Support</td>
+                            <td class="px-6 py-4 text-center text-gray-600">Email</td>
+                            <td class="px-6 py-4 text-center text-blue-700 font-semibold">24/7 Priority</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showCurrentPlanMessage(companyName) {
+            const tier = '{{ company.get("subscription_tier", "FREE") if company else "FREE" }}';
+            const tierName = tier === 'PREMIUM' ? 'Premium' : 'Free';
+            
+            // Show success modal for current plan
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+            modal.innerHTML = `
+                <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 text-center transform animate-bounce-in">
+                    <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-12 h-12 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900 mb-2">${tierName} Subscription Active!</h3>
+                    <p class="text-gray-600 mb-2"><strong>${companyName}</strong> has been ${tierName.toLowerCase()}ly subscribed!</p>
+                    <p class="text-gray-600 mb-6">Congrats! 🎉</p>
+                    <button onclick="this.closest('.fixed').remove()" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-8 rounded-lg transition-colors">
+                        Close
+                    </button>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        function selectFreePlan(companyName) {
+            // Confirm FREE plan selection with friendly message
+            const message = 'Do you want to stay with the FREE plan?\n\n' +
+                'You can upgrade to Premium anytime to unlock:\n' +
+                '• Reverse Auction Access\n' +
+                '• AI-Based Recommendations\n' +
+                '• Order Analytics\n' +
+                '• Automated Contracts\n\n' +
+                'After selecting, you cannot change for 30 days.';
+            
+            if (!confirm(message)) {
+                return;
+            }
+            
+            // Call API to update subscription
+            fetch('/api/subscription/update', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({tier: 'FREE'})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showSubscriptionSuccess(companyName, 'Free');
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to update subscription'));
+                }
+            })
+            .catch(error => {
+                alert('Error: ' + error.message);
+            });
+        }
+
+        function showPaymentOptions(companyName) {
+            // Store company name for later use
+            window.currentCompanyName = companyName;
+            
+            // Show payment gateway selection modal
+            const modal = document.createElement('div');
+            modal.id = 'paymentModal';
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+            modal.innerHTML = `
+                <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden">
+                    <!-- Header -->
+                    <div class="bg-gradient-to-r from-blue-600 to-purple-600 px-8 py-6">
+                        <h3 class="text-2xl font-bold text-white">Choose Payment Method</h3>
+                        <p class="text-blue-100 mt-1">Select your preferred payment gateway</p>
+                    </div>
+                    
+                    <!-- Payment Options -->
+                    <div class="p-8">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                            <!-- bKash Option -->
+                            <button onclick="selectPaymentMethod('bkash')" class="payment-option group border-2 border-gray-200 rounded-xl p-6 hover:border-pink-500 hover:shadow-lg transition-all text-left">
+                                <div class="flex items-center justify-between mb-4">
+                                    <div class="w-16 h-16 bg-pink-100 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                                        <span class="text-2xl font-bold text-pink-600">bK</span>
+                                    </div>
+                                    <svg class="w-6 h-6 text-gray-400 group-hover:text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                    </svg>
+                                </div>
+                                <h4 class="text-xl font-bold text-gray-900 mb-2">bKash</h4>
+                                <p class="text-sm text-gray-600">Pay with bKash mobile wallet</p>
+                            </button>
+
+                            <!-- BRAC Bank Option -->
+                            <button onclick="selectPaymentMethod('brac')" class="payment-option group border-2 border-gray-200 rounded-xl p-6 hover:border-blue-500 hover:shadow-lg transition-all text-left">
+                                <div class="flex items-center justify-between mb-4">
+                                    <div class="w-16 h-16 bg-blue-100 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                                        <span class="text-2xl font-bold text-blue-600">BB</span>
+                                    </div>
+                                    <svg class="w-6 h-6 text-gray-400 group-hover:text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                    </svg>
+                                </div>
+                                <h4 class="text-xl font-bold text-gray-900 mb-2">BRAC Bank</h4>
+                                <p class="text-sm text-gray-600">Pay with BRAC Bank card</p>
+                            </button>
+                        </div>
+
+                        <button onclick="closePaymentModal()" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-3 px-6 rounded-lg transition-colors">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        function closePaymentModal() {
+            const modal = document.getElementById('paymentModal');
+            if (modal) modal.remove();
+        }
+
+        function selectPaymentMethod(method) {
+            closePaymentModal();
+            
+            // Show payment form based on selected method
+            if (method === 'bkash') {
+                showBkashForm();
+            } else if (method === 'brac') {
+                showBracBankForm();
+            }
+        }
+
+        function showBkashForm() {
+            const modal = document.createElement('div');
+            modal.id = 'bkashFormModal';
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+            modal.innerHTML = `
+                <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+                    <!-- Header -->
+                    <div class="bg-gradient-to-r from-pink-500 to-pink-600 px-8 py-6">
+                        <h3 class="text-2xl font-bold text-white">bKash Payment</h3>
+                        <p class="text-pink-100 mt-1">Enter your bKash details</p>
+                    </div>
+                    
+                    <!-- Form -->
+                    <form onsubmit="processBkashPayment(event)" class="p-8">
+                        <div class="mb-6">
+                            <label class="block text-sm font-bold text-gray-900 mb-2">bKash Account Number *</label>
+                            <input type="text" id="bkash_number" placeholder="01XXXXXXXXX" 
+                                class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-pink-500 focus:outline-none" required>
+                        </div>
+
+                        <div class="mb-6">
+                            <label class="block text-sm font-bold text-gray-900 mb-2">PIN (4 digits) *</label>
+                            <input type="password" id="bkash_pin" placeholder="****" maxlength="4"
+                                class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-pink-500 focus:outline-none" required>
+                        </div>
+
+                        <div class="bg-pink-50 border-2 border-pink-200 rounded-lg p-4 mb-6">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-gray-700 font-semibold">Premium Plan</span>
+                                <span class="text-2xl font-bold text-pink-600">৳7,920</span>
+                            </div>
+                            <p class="text-sm text-gray-600">$99/month (1 USD = ৳80)</p>
+                        </div>
+
+                        <button type="submit" class="w-full bg-gradient-to-r from-pink-500 to-pink-600 hover:from-pink-600 hover:to-pink-700 text-white font-bold py-3 px-6 rounded-lg transition-all shadow-lg hover:shadow-xl mb-3">
+                            Pay ৳7,920
+                        </button>
+
+                        <button type="button" onclick="closeBkashForm()" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-3 px-6 rounded-lg transition-colors">
+                            Cancel
+                        </button>
+                    </form>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        function closeBkashForm() {
+            const modal = document.getElementById('bkashFormModal');
+            if (modal) modal.remove();
+        }
+
+        function processBkashPayment(event) {
+            event.preventDefault();
+            closeBkashForm();
+            
+            // Show processing
+            showProcessing();
+            
+            // Simulate payment processing and update subscription
+            setTimeout(() => {
+                updateSubscriptionToPremium();
+            }, 2000);
+        }
+
+        function showBracBankForm() {
+            const modal = document.createElement('div');
+            modal.id = 'bracFormModal';
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+            modal.innerHTML = `
+                <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+                    <!-- Header -->
+                    <div class="bg-gradient-to-r from-blue-600 to-blue-700 px-8 py-6">
+                        <h3 class="text-2xl font-bold text-white">BRAC Bank Payment</h3>
+                        <p class="text-blue-100 mt-1">Enter your card details</p>
+                    </div>
+                    
+                    <!-- Form -->
+                    <form onsubmit="processBracPayment(event)" class="p-8">
+                        <div class="mb-4">
+                            <label class="block text-sm font-bold text-gray-900 mb-2">Card Number *</label>
+                            <input type="text" id="card_number" placeholder="1234 5678 9012 3456" maxlength="19"
+                                class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none" required>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="block text-sm font-bold text-gray-900 mb-2">Expiry Date *</label>
+                                <input type="text" id="expiry" placeholder="MM/YY" maxlength="5"
+                                    class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none" required>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold text-gray-900 mb-2">CVV *</label>
+                                <input type="password" id="cvv" placeholder="***" maxlength="3"
+                                    class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none" required>
+                            </div>
+                        </div>
+
+                        <div class="mb-6">
+                            <label class="block text-sm font-bold text-gray-900 mb-2">Cardholder Name *</label>
+                            <input type="text" id="card_name" placeholder="John Doe"
+                                class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none" required>
+                        </div>
+
+                        <div class="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 mb-6">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-gray-700 font-semibold">Premium Plan</span>
+                                <span class="text-2xl font-bold text-blue-600">৳7,920</span>
+                            </div>
+                            <p class="text-sm text-gray-600">$99/month (1 USD = ৳80)</p>
+                        </div>
+
+                        <button type="submit" class="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold py-3 px-6 rounded-lg transition-all shadow-lg hover:shadow-xl mb-3">
+                            Pay ৳7,920
+                        </button>
+
+                        <button type="button" onclick="closeBracForm()" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-3 px-6 rounded-lg transition-colors">
+                            Cancel
+                        </button>
+                    </form>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        function closeBracForm() {
+            const modal = document.getElementById('bracFormModal');
+            if (modal) modal.remove();
+        }
+
+        function processBracPayment(event) {
+            event.preventDefault();
+            closeBracForm();
+            
+            // Show processing
+            showProcessing();
+            
+            // Simulate payment processing and update subscription
+            setTimeout(() => {
+                updateSubscriptionToPremium();
+            }, 2000);
+        }
+
+        function updateSubscriptionToPremium() {
+            // Call API to update subscription to PREMIUM
+            fetch('/api/subscription/update', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({tier: 'PREMIUM'})
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideProcessing();
+                if (data.success) {
+                    showSubscriptionSuccess(window.currentCompanyName || 'User', 'Premium');
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to update subscription'));
+                }
+            })
+            .catch(error => {
+                hideProcessing();
+                alert('Error: ' + error.message);
+            });
+        }
+
+        function showSubscriptionSuccess(companyName, tierName) {
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+            modal.innerHTML = `
+                <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-8 text-center">
+                    <div class="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 animate-bounce">
+                        <svg class="w-16 h-16 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-3xl font-bold text-gray-900 mb-3">Congratulations! 🎉</h3>
+                    <p class="text-lg text-gray-700 mb-2">You are now on the <span class="font-bold text-blue-600">PREMIUM</span> plan!</p>
+                    <p class="text-md text-gray-600 mb-6">Valid for the next <span class="font-bold">30 days</span></p>
+                    
+                    ${tierName === 'Premium' ? `
+                    <div class="bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl p-6 mb-6 text-left">
+                        <p class="text-base font-bold text-gray-900 mb-4 text-center">Premium Features Unlocked:</p>
+                        <ul class="space-y-3">
+                            <li class="flex items-start">
+                                <svg class="w-5 h-5 text-blue-600 mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                </svg>
+                                <span class="text-gray-700"><strong>Reverse Auction</strong> - Real-time competitive bidding</span>
+                            </li>
+                            <li class="flex items-start">
+                                <svg class="w-5 h-5 text-blue-600 mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                                </svg>
+                                <span class="text-gray-700"><strong>AI-Based Recommendations</strong> - Smart supplier matching</span>
+                            </li>
+                            <li class="flex items-start">
+                                <svg class="w-5 h-5 text-blue-600 mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                                </svg>
+                                <span class="text-gray-700"><strong>Order Analytics</strong> - Advanced insights & reports</span>
+                            </li>
+                            <li class="flex items-start">
+                                <svg class="w-5 h-5 text-blue-600 mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                                <span class="text-gray-700"><strong>Automated Contracts</strong> - One-click generation</span>
+                            </li>
+                            <li class="flex items-start">
+                                <svg class="w-5 h-5 text-blue-600 mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                <span class="text-gray-700">Priority Support (24/7)</span>
+                            </li>
+                            <li class="flex items-start">
+                                <svg class="w-5 h-5 text-blue-600 mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                <span class="text-gray-700">Unlimited RFQs & Auctions</span>
+                            </li>
+                            <li class="flex items-start">
+                                <svg class="w-5 h-5 text-blue-600 mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                <span class="text-gray-700">Custom Branding Options</span>
+                            </li>
+                        </ul>
+                    </div>
+                    ` : ''}
+                    
+                    <div class="bg-yellow-50 border-2 border-yellow-200 rounded-lg p-4 mb-6">
+                        <p class="text-sm font-semibold text-gray-800">⏰ After 30 days, you'll be automatically downgraded to FREE plan</p>
+                        <p class="text-xs text-gray-600 mt-1">To continue using PREMIUM features, you'll need to subscribe again</p>
+                    </div>
+                    
+                    <button onclick="window.location.reload()" class="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-bold py-3 px-6 rounded-lg transition-all shadow-lg hover:shadow-xl mb-3">
+                        Continue
+                    </button>
+                    
+                    <button onclick="this.closest('.fixed').remove()" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-3 px-6 rounded-lg transition-colors">
+                        Close
+                    </button>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        function showProcessing() {
+            const modal = document.createElement('div');
+            modal.id = 'processingModal';
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+            modal.innerHTML = `
+                <div class="bg-white rounded-2xl shadow-2xl p-8 text-center">
+                    <div class="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-4"></div>
+                    <p class="text-lg font-semibold text-gray-900">Processing Payment...</p>
+                    <p class="text-sm text-gray-600 mt-2">Please wait</p>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        function hideProcessing() {
+            const modal = document.getElementById('processingModal');
+            if (modal) modal.remove();
+        }
+
+        function upgradeToPremium() {
+            showPaymentOptions(window.currentCompanyName || 'User');
+        }
+    </script>
+</body>
+</html>

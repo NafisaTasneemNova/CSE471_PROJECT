@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}Capacity Monitor – Admin | TexBid{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-[#f8f9fb]">
+
+  <!-- Header -->
+  <div class="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div class="flex items-center justify-between gap-4">
+        <div>
+          <div class="flex items-center gap-3 mb-1">
+            <a href="/admin/dashboard" class="text-blue-300 hover:text-white text-sm transition">← Admin</a>
+            <span class="text-blue-600">/</span>
+            <h1 class="text-2xl font-extrabold">Factory Capacity Monitor</h1>
+          </div>
+          <p class="text-blue-200 text-sm">Monitor supplier capacity declarations and flag suspicious entries.</p>
+        </div>
+        <div class="flex gap-3">
+          <div class="bg-white/10 border border-white/20 rounded-xl px-4 py-2 text-center">
+            <p class="text-2xl font-extrabold">{{ total_suppliers }}</p>
+            <p class="text-xs text-blue-300">Total Suppliers</p>
+          </div>
+          <div class="bg-amber-500/20 border border-amber-400/30 rounded-xl px-4 py-2 text-center">
+            <p class="text-2xl font-extrabold text-amber-300">{{ suspicious_count }}</p>
+            <p class="text-xs text-amber-300">Suspicious</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+    {% if suspicious_count > 0 %}
+    <div class="mb-6 bg-amber-50 border-2 border-amber-300 rounded-xl p-4 flex items-start gap-3">
+      <svg class="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+      <div>
+        <p class="text-sm font-bold text-amber-800">{{ suspicious_count }} suspicious entr{{ 'y' if suspicious_count == 1 else 'ies' }} detected</p>
+        <p class="text-xs text-amber-700 mt-0.5">Declared capacity is more than 3× the estimate from their legal workforce/machine data. Review these suppliers.</p>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if entries %}
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+        <h2 class="text-base font-bold text-gray-900">Supplier Capacity Declarations</h2>
+        <span class="text-xs text-gray-400">{{ entries|length }} supplier{{ 's' if entries|length != 1 else '' }}</span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full min-w-[900px]">
+          <thead>
+            <tr class="bg-slate-50">
+              <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Supplier</th>
+              <th class="px-5 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Total Cap.</th>
+              <th class="px-5 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Available</th>
+              <th class="px-5 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Utilization</th>
+              <th class="px-5 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Legal Estimate</th>
+              <th class="px-5 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Status</th>
+              <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Last Updated</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            {% for e in entries %}
+            <tr class="hover:bg-slate-50/60 transition {% if e.suspicious %}bg-amber-50/40{% endif %}">
+              <td class="px-5 py-4">
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                    {{ e.company_name[0]|upper }}
+                  </div>
+                  <div>
+                    <p class="text-sm font-semibold text-gray-900">{{ e.company_name }}</p>
+                    <p class="text-xs text-gray-400 font-mono">{{ e.supplier_id[:12] }}…</p>
+                  </div>
+                </div>
+              </td>
+              <td class="px-5 py-4 text-right text-sm font-bold text-gray-800">{{ '{:,}'.format(e.total_capacity) }}</td>
+              <td class="px-5 py-4 text-right text-sm font-semibold {% if e.available_capacity == 0 %}text-red-600{% else %}text-green-600{% endif %}">
+                {{ '{:,}'.format(e.available_capacity) }}
+              </td>
+              <td class="px-5 py-4">
+                <div class="flex items-center gap-2 justify-center">
+                  <div class="w-20 bg-gray-200 rounded-full h-1.5">
+                    <div class="h-1.5 rounded-full {% if e.utilization_pct >= 90 %}bg-red-500{% elif e.utilization_pct >= 60 %}bg-amber-500{% else %}bg-green-500{% endif %}"
+                      style="width: {{ e.utilization_pct }}%"></div>
+                  </div>
+                  <span class="text-xs font-bold text-gray-600">{{ e.utilization_pct }}%</span>
+                </div>
+              </td>
+              <td class="px-5 py-4 text-right text-sm text-gray-500">
+                {% if e.estimated_from_legal > 0 %}
+                  {{ '{:,}'.format(e.estimated_from_legal) }}
+                {% else %}
+                  <span class="text-gray-300 italic">No legal data</span>
+                {% endif %}
+              </td>
+              <td class="px-5 py-4 text-center">
+                {% if e.suspicious %}
+                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-700 border border-amber-200">
+                  <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+                  Suspicious
+                </span>
+                {% else %}
+                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700 border border-green-200">
+                  <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                  Normal
+                </span>
+                {% endif %}
+              </td>
+              <td class="px-5 py-4 text-xs text-gray-400">
+                {% if e.last_updated %}{{ e.last_updated[:16]|replace('T',' ') }}{% else %}—{% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    {% else %}
+    <div class="bg-white rounded-2xl border border-gray-100 p-16 text-center">
+      <svg class="w-16 h-16 text-gray-200 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+      <p class="text-base font-semibold text-gray-500">No capacity declarations yet</p>
+      <p class="text-sm text-gray-400 mt-1">Suppliers haven't set their capacity yet.</p>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endblock %}

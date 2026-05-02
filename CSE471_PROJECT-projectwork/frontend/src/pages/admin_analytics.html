@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Analytics - TexBid</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="bg-gradient-to-br from-slate-50 to-slate-100">
+    <!-- Header -->
+    <nav class="bg-gradient-to-r from-red-600 to-red-700 shadow-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+            <div>
+                <h1 class="text-2xl font-bold text-white">🔐 Admin Analytics Dashboard</h1>
+                <p class="text-sm text-red-100">Marketplace Health & Performance Monitoring</p>
+            </div>
+            <a href="/" class="text-white hover:text-red-100 font-semibold">← Back to Home</a>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Admin Badge -->
+        <div class="mb-6 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <span class="bg-red-600 text-white px-4 py-2 rounded-full text-sm font-bold shadow-lg">
+                    👑 ADMIN ACCESS
+                </span>
+                <span class="text-gray-600">Monitoring <strong>{{ admin_analytics.total_users }}</strong> users</span>
+            </div>
+            <div class="text-right">
+                <p class="text-sm text-gray-600">Last Updated</p>
+                <p class="text-sm font-semibold text-gray-900" id="lastUpdated"></p>
+            </div>
+        </div>
+
+        <!-- Marketplace Health Metrics -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <!-- Active Deals -->
+            <div class="bg-white rounded-xl shadow-lg p-6 border-l-4 border-blue-500">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-sm font-semibold text-gray-600">Active Deals</h3>
+                    <svg class="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                    </svg>
+                </div>
+                <p class="text-3xl font-bold text-gray-900">{{ admin_analytics.active_deals }}</p>
+                <p class="text-sm text-blue-600 mt-1">+{{ admin_analytics.deals_growth }}% this month</p>
+            </div>
+
+            <!-- Total Revenue -->
+            <div class="bg-white rounded-xl shadow-lg p-6 border-l-4 border-green-500">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-sm font-semibold text-gray-600">Total Revenue</h3>
+                    <svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+                <p class="text-3xl font-bold text-gray-900">${{ admin_analytics.total_revenue }}</p>
+                <p class="text-sm text-green-600 mt-1">+{{ admin_analytics.revenue_growth }}% this month</p>
+            </div>
+
+            <!-- Dispute Rate -->
+            <div class="bg-white rounded-xl shadow-lg p-6 border-l-4 border-orange-500">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-sm font-semibold text-gray-600">Dispute Rate</h3>
+                    <svg class="w-8 h-8 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    </svg>
+                </div>
+                <p class="text-3xl font-bold text-gray-900">{{ admin_analytics.dispute_rate }}%</p>
+                <p class="text-sm {% if admin_analytics.dispute_trend < 0 %}text-green-600{% else %}text-red-600{% endif %} mt-1">
+                    {{ admin_analytics.dispute_trend }}% vs last month
+                </p>
+            </div>
+
+            <!-- Payment Flow -->
+            <div class="bg-white rounded-xl shadow-lg p-6 border-l-4 border-purple-500">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-sm font-semibold text-gray-600">Payment Flow</h3>
+                    <svg class="w-8 h-8 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path>
+                    </svg>
+                </div>
+                <p class="text-3xl font-bold text-gray-900">${{ admin_analytics.payment_flow }}</p>
+                <p class="text-sm text-gray-500 mt-1">Last 30 days</p>
+            </div>
+        </div>
+
+        <!-- User Statistics -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h3 class="text-lg font-bold text-gray-900 mb-4">User Distribution</h3>
+                <div style="height: 250px;">
+                    <canvas id="userDistributionChart"></canvas>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h3 class="text-lg font-bold text-gray-900 mb-4">Subscription Breakdown</h3>
+                <div style="height: 250px;">
+                    <canvas id="subscriptionChart"></canvas>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h3 class="text-lg font-bold text-gray-900 mb-4">Key Metrics</h3>
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm text-gray-600">Total Users</span>
+                        <span class="text-lg font-bold text-gray-900">{{ admin_analytics.total_users }}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm text-gray-600">Active RFQs</span>
+                        <span class="text-lg font-bold text-blue-600">{{ admin_analytics.active_rfqs }}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm text-gray-600">Total Bids</span>
+                        <span class="text-lg font-bold text-green-600">{{ admin_analytics.total_bids }}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm text-gray-600">Avg Response Time</span>
+                        <span class="text-lg font-bold text-purple-600">{{ admin_analytics.avg_response_time }}h</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Revenue & Payment Trends -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+            <h3 class="text-lg font-bold text-gray-900 mb-4">Revenue & Payment Trends</h3>
+            <div style="height: 300px;">
+                <canvas id="revenueChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Dispute Management -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h3 class="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                    <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    </svg>
+                    Active Disputes
+                </h3>
+                <div class="space-y-3">
+                    {% for dispute in admin_analytics.active_disputes %}
+                    <div class="border-l-4 border-red-500 bg-red-50 p-4 rounded">
+                        <div class="flex justify-between items-start mb-2">
+                            <p class="font-semibold text-gray-900">Dispute #{{ dispute.id[:8] }}</p>
+                            <span class="text-xs bg-red-600 text-white px-2 py-1 rounded-full">{{ dispute.priority }}</span>
+                        </div>
+                        <p class="text-sm text-gray-700 mb-2">{{ dispute.description }}</p>
+                        <div class="flex justify-between items-center text-xs text-gray-600">
+                            <span>Filed: {{ dispute.date }}</span>
+                            <span>Amount: ${{ dispute.amount }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h3 class="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                    <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                    </svg>
+                    Platform Health Score
+                </h3>
+                <div class="flex items-center justify-center mb-4">
+                    <div class="relative w-48 h-48">
+                        <svg class="transform -rotate-90 w-48 h-48">
+                            <circle cx="96" cy="96" r="88" stroke="#e5e7eb" stroke-width="16" fill="none" />
+                            <circle cx="96" cy="96" r="88" stroke="#10b981" stroke-width="16" fill="none"
+                                stroke-dasharray="{{ (admin_analytics.health_score / 100 * 552.92) }} 552.92" 
+                                stroke-linecap="round" />
+                        </svg>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center">
+                            <span class="text-5xl font-bold text-gray-900">{{ admin_analytics.health_score }}</span>
+                            <span class="text-sm text-gray-600">Health Score</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="space-y-2">
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">User Satisfaction</span>
+                        <span class="font-semibold text-green-600">{{ admin_analytics.user_satisfaction }}%</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">System Uptime</span>
+                        <span class="font-semibold text-green-600">{{ admin_analytics.system_uptime }}%</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Transaction Success</span>
+                        <span class="font-semibold text-green-600">{{ admin_analytics.transaction_success }}%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Export Reports -->
+        <div class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl shadow-lg p-6 border-2 border-blue-200">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">Generate Reports</h3>
+                    <p class="text-sm text-gray-600">Export detailed analytics reports for transparency and compliance</p>
+                </div>
+                <div class="flex gap-3">
+                    <button onclick="exportReport('pdf')" class="bg-red-600 hover:bg-red-700 text-white font-semibold px-6 py-3 rounded-lg shadow-lg transition-all flex items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                        </svg>
+                        Export PDF
+                    </button>
+                    <button onclick="exportReport('csv')" class="bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-3 rounded-lg shadow-lg transition-all flex items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        Export CSV
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Update last updated time
+        document.getElementById('lastUpdated').textContent = new Date().toLocaleString();
+
+        // User Distribution Chart
+        const userDistCtx = document.getElementById('userDistributionChart').getContext('2d');
+        new Chart(userDistCtx, {
+            type: 'pie',
+            data: {
+                labels: ['Buyers', 'Suppliers', 'Both'],
+                datasets: [{
+                    data: {{ admin_analytics.user_distribution | tojson }},
+                    backgroundColor: [
+                        'rgba(59, 130, 246, 0.8)',
+                        'rgba(34, 197, 94, 0.8)',
+                        'rgba(168, 85, 247, 0.8)'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { position: 'bottom' }
+                }
+            }
+        });
+
+        // Subscription Chart
+        const subCtx = document.getElementById('subscriptionChart').getContext('2d');
+        new Chart(subCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['FREE', 'PREMIUM'],
+                datasets: [{
+                    data: {{ admin_analytics.subscription_breakdown | tojson }},
+                    backgroundColor: [
+                        'rgba(156, 163, 175, 0.8)',
+                        'rgba(168, 85, 247, 0.8)'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { position: 'bottom' }
+                }
+            }
+        });
+
+        // Revenue Chart
+        const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+        new Chart(revenueCtx, {
+            type: 'line',
+            data: {
+                labels: {{ admin_analytics.revenue_labels | tojson }},
+                datasets: [{
+                    label: 'Revenue',
+                    data: {{ admin_analytics.revenue_data | tojson }},
+                    borderColor: 'rgba(34, 197, 94, 1)',
+                    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }, {
+                    label: 'Payments',
+                    data: {{ admin_analytics.payment_data | tojson }},
+                    borderColor: 'rgba(59, 130, 246, 1)',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+
+        function exportReport(format) {
+            alert(`Exporting ${format.toUpperCase()} report... This feature will generate a comprehensive analytics report.`);
+            // In production, this would call an API endpoint to generate the report
+        }
+    </script>
+</body>
+</html>
