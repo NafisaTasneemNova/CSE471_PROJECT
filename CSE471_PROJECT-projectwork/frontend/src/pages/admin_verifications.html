@@ -1,0 +1,328 @@
+{% extends "base.html" %}
+
+{% block title %}Verification Queue - Admin{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-slate-50 py-10">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        
+        <div class="mb-8 flex items-center justify-between">
+            <div>
+                <a href="/admin/dashboard" class="text-sm text-blue-600 hover:text-blue-800 font-semibold mb-2 inline-block">← Back to Dashboard</a>
+                <h1 class="text-3xl font-extrabold text-gray-900">Verification Queue</h1>
+                <p class="text-gray-500 mt-1">Review and approve pending company profiles</p>
+            </div>
+            <button onclick="loadQueue()" class="flex items-center gap-2 bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition shadow-sm font-semibold">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+                Refresh Queue
+            </button>
+        </div>
+
+        <!-- Main Queue Container -->
+        <div class="bg-white shadow-xl rounded-2xl overflow-hidden border border-gray-200">
+            <div id="queue-loading" class="p-12 text-center">
+                <svg class="animate-spin h-10 w-10 text-blue-600 mx-auto mb-4" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <p class="text-gray-500 font-medium">Loading pending verifications...</p>
+            </div>
+
+            <div id="queue-empty" class="hidden p-16 text-center">
+                <div class="inline-flex items-center justify-center w-20 h-20 bg-green-100 rounded-full mb-6">
+                    <svg class="h-10 w-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+                <h3 class="text-2xl font-bold text-gray-900 mb-2">All Caught Up!</h3>
+                <p class="text-gray-500 max-w-sm mx-auto">There are no pending company profiles waiting for verification at the moment.</p>
+            </div>
+
+            <div id="queue-content" class="hidden">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Company Details</th>
+                                <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Role</th>
+                                <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Submitted Date</th>
+                                <th class="px-6 py-4 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="queue-table-body" class="bg-white divide-y divide-gray-200">
+                            <!-- Rows rendered via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Details Modal -->
+<div id="detailsModal" class="hidden fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+    <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <!-- Background overlay -->
+        <div class="fixed inset-0 bg-slate-900 bg-opacity-75 transition-opacity backdrop-blur-sm" aria-hidden="true" onclick="closeModal()"></div>
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+        <!-- Modal panel -->
+        <div class="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl w-full">
+            <div class="bg-gradient-to-r from-blue-600 to-blue-800 px-6 py-4 flex justify-between items-center">
+                <h3 class="text-xl leading-6 font-bold text-white" id="modal-company-name">Company Name</h3>
+                <button onclick="closeModal()" class="text-white hover:text-gray-200 focus:outline-none">
+                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <div class="px-6 py-6" id="modal-content">
+                <!-- Content injected via JS -->
+            </div>
+
+            <div class="bg-gray-50 px-6 py-4 sm:flex sm:flex-row-reverse border-t border-gray-200 gap-3">
+                <button type="button" id="btn-approve" class="w-full inline-flex justify-center rounded-lg border border-transparent shadow-sm px-5 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:w-auto sm:text-sm transition">
+                    Approve Verification
+                </button>
+                <button type="button" id="btn-reject" class="mt-3 w-full inline-flex justify-center rounded-lg border border-transparent shadow-sm px-5 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:mt-0 sm:w-auto sm:text-sm transition">
+                    Reject Application
+                </button>
+                <button type="button" onclick="closeModal()" class="mt-3 w-full inline-flex justify-center rounded-lg border border-gray-300 shadow-sm px-5 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:w-auto sm:text-sm transition">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentQueue = [];
+    let selectedCompanyId = null;
+
+    document.addEventListener("DOMContentLoaded", () => {
+        loadQueue();
+    });
+
+    async function loadQueue() {
+        document.getElementById('queue-loading').classList.remove('hidden');
+        document.getElementById('queue-empty').classList.add('hidden');
+        document.getElementById('queue-content').classList.add('hidden');
+
+        try {
+            const res = await fetch('/api/admin/verifications');
+            const data = await res.json();
+            
+            if (data.success) {
+                currentQueue = data.companies;
+                renderQueue();
+            }
+        } catch (error) {
+            console.error("Failed to load verification queue", error);
+        }
+    }
+
+    function renderQueue() {
+        document.getElementById('queue-loading').classList.add('hidden');
+        
+        if (currentQueue.length === 0) {
+            document.getElementById('queue-empty').classList.remove('hidden');
+            return;
+        }
+
+        const tbody = document.getElementById('queue-table-body');
+        tbody.innerHTML = '';
+
+        currentQueue.forEach(company => {
+            const tr = document.createElement('tr');
+            tr.className = "hover:bg-blue-50 transition-colors group cursor-pointer";
+            tr.onclick = () => openModal(company.id);
+            
+            tr.innerHTML = `
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0 h-10 w-10 bg-gradient-to-br from-blue-100 to-blue-200 rounded-full flex items-center justify-center text-blue-700 font-bold text-lg">
+                            ${company.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div class="ml-4">
+                            <div class="text-sm font-bold text-gray-900 group-hover:text-blue-700 transition">${company.name}</div>
+                            <div class="text-sm text-gray-500 font-mono text-xs mt-0.5">ID: ${company.id.substring(0,8)}...</div>
+                        </div>
+                    </div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="px-3 py-1 inline-flex text-xs leading-5 font-bold rounded-full ${company.role === 'SUPPLIER' ? 'bg-purple-100 text-purple-800' : 'bg-amber-100 text-amber-800'}">
+                        ${company.role}
+                    </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-medium">
+                    ${new Date(company.created_at).toLocaleDateString()}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <button class="text-blue-600 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 px-4 py-2 rounded-lg transition font-semibold">Review</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        document.getElementById('queue-content').classList.remove('hidden');
+    }
+
+    function openModal(companyId) {
+        selectedCompanyId = companyId;
+        const company = currentQueue.find(c => c.id === companyId);
+        if (!company) return;
+
+        document.getElementById('modal-company-name').textContent = company.name;
+        
+        let contentHtml = `
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <!-- Basic Info -->
+                <div>
+                    <h4 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 border-b pb-2">Business Information</h4>
+                    <dl class="space-y-4">
+                        <div>
+                            <dt class="text-xs font-semibold text-gray-500">Company Name</dt>
+                            <dd class="text-sm font-medium text-gray-900 mt-1">${company.name}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs font-semibold text-gray-500">Role</dt>
+                            <dd class="text-sm font-medium text-gray-900 mt-1">${company.role}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs font-semibold text-gray-500">Registration Date</dt>
+                            <dd class="text-sm font-medium text-gray-900 mt-1">${new Date(company.created_at).toLocaleString()}</dd>
+                        </div>
+                    </dl>
+                </div>
+        `;
+
+        if (company.legal_capacity) {
+            const lc = company.legal_capacity;
+            contentHtml += `
+                <div>
+                    <h4 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 border-b pb-2">Legal & Capacity Details</h4>
+                    <dl class="space-y-4">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <dt class="text-xs font-semibold text-gray-500">Business License No</dt>
+                                <dd class="text-sm font-medium text-gray-900 mt-1 font-mono">${lc.business_license_no}</dd>
+                            </div>
+                            <div>
+                                <dt class="text-xs font-semibold text-gray-500">Trade License No</dt>
+                                <dd class="text-sm font-medium text-gray-900 mt-1 font-mono">${lc.trade_license_no}</dd>
+                            </div>
+                        </div>
+                        <div>
+                            <dt class="text-xs font-semibold text-gray-500">Manufacturing Type</dt>
+                            <dd class="text-sm font-medium text-gray-900 mt-1">${lc.manufacturing_type}</dd>
+                        </div>
+                        <div class="grid grid-cols-3 gap-4">
+                            <div>
+                                <dt class="text-xs font-semibold text-gray-500">Workers</dt>
+                                <dd class="text-sm font-medium text-gray-900 mt-1">${lc.total_workers}</dd>
+                            </div>
+                            <div>
+                                <dt class="text-xs font-semibold text-gray-500">Machines</dt>
+                                <dd class="text-sm font-medium text-gray-900 mt-1">${lc.total_machines}</dd>
+                            </div>
+                            <div>
+                                <dt class="text-xs font-semibold text-gray-500">Turnover</dt>
+                                <dd class="text-sm font-medium text-gray-900 mt-1">$${lc.annual_turnover.toLocaleString()}</dd>
+                            </div>
+                        </div>
+                        <div class="mt-4 pt-4 border-t border-gray-100">
+                            <a href="${lc.business_license_url}" target="_blank" class="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 font-semibold bg-blue-50 px-3 py-2 rounded-lg transition">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
+                                View License Document
+                            </a>
+                        </div>
+                    </dl>
+                </div>
+            `;
+        } else {
+            contentHtml += `
+                <div>
+                    <h4 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 border-b pb-2">Legal & Capacity Details</h4>
+                    <p class="text-sm text-gray-500 italic">No legal information provided.</p>
+                </div>
+            `;
+        }
+        
+        contentHtml += `</div>`; // Close grid
+
+        // Certifications
+        if (company.certifications && company.certifications.length > 0) {
+            contentHtml += `
+                <div class="mt-8 pt-6 border-t border-gray-200">
+                    <h4 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">Certifications Provided</h4>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            `;
+            company.certifications.forEach(cert => {
+                contentHtml += `
+                    <div class="border border-gray-200 rounded-lg p-4 bg-gray-50 hover:bg-white hover:shadow-md transition-all">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="font-bold text-gray-900 text-sm">${cert.cert_type}</span>
+                        </div>
+                        <p class="text-xs font-mono text-gray-500 mb-3 break-all">ID: ${cert.cert_number}</p>
+                        <a href="${cert.document_url}" target="_blank" class="text-xs text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1">
+                            <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                            View Certificate
+                        </a>
+                    </div>
+                `;
+            });
+            contentHtml += `</div></div>`;
+        }
+
+        document.getElementById('modal-content').innerHTML = contentHtml;
+        
+        // Setup buttons
+        document.getElementById('btn-approve').onclick = () => processAction('verify');
+        document.getElementById('btn-reject').onclick = () => processAction('reject');
+
+        document.getElementById('detailsModal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+        document.getElementById('detailsModal').classList.add('hidden');
+        selectedCompanyId = null;
+    }
+
+    async function processAction(action) {
+        if (!selectedCompanyId) return;
+        
+        if (action === 'reject') {
+            if (!confirm("Are you sure you want to reject this company's application?")) return;
+        }
+
+        const btnApprove = document.getElementById('btn-approve');
+        const btnReject = document.getElementById('btn-reject');
+        
+        btnApprove.disabled = true;
+        btnReject.disabled = true;
+        btnApprove.textContent = 'Processing...';
+
+        try {
+            const res = await fetch(`/api/admin/${action}/${selectedCompanyId}`, {
+                method: 'POST'
+            });
+            const data = await res.json();
+            
+            if (data.success) {
+                alert(`Application successfully ${action === 'verify' ? 'approved' : 'rejected'}.`);
+                closeModal();
+                loadQueue();
+            } else {
+                alert(`Error: ${data.error}`);
+            }
+        } catch (error) {
+            alert('Failed to process request due to a network error.');
+        } finally {
+            btnApprove.disabled = false;
+            btnReject.disabled = false;
+            btnApprove.textContent = 'Approve Verification';
+        }
+    }
+</script>
+{% endblock %}

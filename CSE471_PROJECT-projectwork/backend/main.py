@@ -436,12 +436,6 @@ async def require_seller(user_and_role: tuple = Depends(get_current_user_with_mo
 # Alias for existing routes that use require_supplier
 require_supplier = require_seller
 
-async def require_admin(user_and_role: tuple = Depends(get_current_user_with_mock_role)):
-    user, role = user_and_role
-    if role != UserRole.ADMIN.value:
-        raise HTTPException(status_code=403, detail="Access denied. ADMIN privileges required.")
-    return user or {"mock": True, "role": role}
-
 async def require_active_participant(user_and_role: tuple = Depends(get_current_user_with_mock_role)):
     user, role = user_and_role
     if role not in [UserRole.BUYER.value, UserRole.SELLER.value]:
@@ -855,6 +849,153 @@ async def get_all_companies(admin: dict = Depends(require_admin)):
         }
     except Exception as e:
         print(f"Error fetching companies: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+# ----------------------------------------
+# ADMIN VERIFICATIONS
+# ----------------------------------------
+
+@app.get("/admin/verifications", response_class=HTMLResponse)
+async def admin_verifications_page(request: Request, admin: dict = Depends(require_admin)):
+    """Display admin profile verification queue page."""
+    return templates.TemplateResponse("admin_verifications.html", {"request": request, "user": admin})
+
+
+@app.get("/api/admin/verifications")
+async def get_pending_verifications(admin: dict = Depends(require_admin)):
+    """Get all companies pending verification."""
+    from database import db
+    
+    if db is None:
+        return JSONResponse({"success": False, "error": "Database not available"}, status_code=500)
+    
+    try:
+        companies = await db["companies"].find({"overall_status": OverallStatusEnum.PENDING_REVIEW}).to_list(length=1000)
+        
+        # Hydrate with legal docs and certifications
+        full_companies = []
+        for company in companies:
+            c_id = company.get("id")
+            
+            # Fetch legal
+            legal = await db["legal_capacity"].find_one({"company_id": c_id})
+            if legal:
+                legal.pop("_id", None)
+                
+            # Fetch certifications
+            certs = await db["certifications"].find({"company_id": c_id}).to_list(length=100)
+            for cert in certs:
+                cert.pop("_id", None)
+                if isinstance(cert.get("issue_date"), datetime):
+                    cert["issue_date"] = cert["issue_date"].isoformat() + 'Z'
+                if isinstance(cert.get("expiry_date"), datetime):
+                    cert["expiry_date"] = cert["expiry_date"].isoformat() + 'Z'
+                    
+            full_companies.append({
+                "id": c_id,
+                "name": company.get("name"),
+                "role": company.get("role"),
+                "overall_status": company.get("overall_status"),
+                "created_at": company.get("created_at").isoformat() + 'Z' if isinstance(company.get("created_at"), datetime) else str(company.get("created_at")),
+                "legal_capacity": legal,
+                "certifications": certs
+            })
+            
+        return {
+            "success": True,
+            "companies": full_companies
+        }
+    except Exception as e:
+        print(f"Error fetching verifications: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.post("/api/admin/verify/{company_id}")
+async def approve_verification(company_id: str, admin: dict = Depends(require_admin)):
+    """Approve a company profile verification."""
+    from database import db
+    
+    if db is None:
+        return JSONResponse({"success": False, "error": "Database not available"}, status_code=500)
+        
+    try:
+        company = await db["companies"].find_one({"id": company_id})
+        if not company:
+            return JSONResponse({"success": False, "error": "Company not found"}, status_code=404)
+            
+        # Update company status and default trust score to 50
+        await db["companies"].update_one(
+            {"id": company_id},
+            {"$set": {
+                "overall_status": OverallStatusEnum.VERIFIED,
+                "trust_score": 50
+            }}
+        )
+        
+        # Update all pending certs to VERIFIED
+        await db["certifications"].update_many(
+            {"company_id": company_id, "verification_status": VerificationStatusEnum.PENDING},
+            {"$set": {"verification_status": VerificationStatusEnum.VERIFIED}}
+        )
+        
+        # Find the user belonging to this company to notify them
+        user = await db["users"].find_one({"company_id": company_id})
+        if user:
+            notification = NotificationModel(
+                user_id=user["id"],
+                type=NotificationTypeEnum.SAMPLE_APPROVED, # Reusing this for general approval
+                title="Profile Verified",
+                message="Your company profile and documents have been successfully verified by an administrator! You now have a starting Trust Score of 50.",
+                related_id=company_id
+            )
+            await db["notifications"].insert_one(notification.model_dump())
+            
+        return {"success": True, "message": "Company verified successfully"}
+    except Exception as e:
+        print(f"Error approving verification: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.post("/api/admin/reject/{company_id}")
+async def reject_verification(company_id: str, admin: dict = Depends(require_admin)):
+    """Reject a company profile verification."""
+    from database import db
+    
+    if db is None:
+        return JSONResponse({"success": False, "error": "Database not available"}, status_code=500)
+        
+    try:
+        company = await db["companies"].find_one({"id": company_id})
+        if not company:
+            return JSONResponse({"success": False, "error": "Company not found"}, status_code=404)
+            
+        # Update company status to REJECTED
+        await db["companies"].update_one(
+            {"id": company_id},
+            {"$set": {"overall_status": OverallStatusEnum.REJECTED}}
+        )
+        
+        # Update all pending certs to INVALID
+        await db["certifications"].update_many(
+            {"company_id": company_id, "verification_status": VerificationStatusEnum.PENDING},
+            {"$set": {"verification_status": VerificationStatusEnum.INVALID}}
+        )
+        
+        # Find the user belonging to this company to notify them
+        user = await db["users"].find_one({"company_id": company_id})
+        if user:
+            notification = NotificationModel(
+                user_id=user["id"],
+                type=NotificationTypeEnum.SAMPLE_REJECTED, # Reusing this for general rejection
+                title="Profile Rejected",
+                message="Your company profile verification was rejected. Please review your documents and try again or contact support.",
+                related_id=company_id
+            )
+            await db["notifications"].insert_one(notification.model_dump())
+            
+        return {"success": True, "message": "Company rejected successfully"}
+    except Exception as e:
+        print(f"Error rejecting verification: {e}")
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
 
@@ -2549,6 +2690,9 @@ async def smart_dashboard(request: Request, user: Optional[dict] = Depends(get_c
 
     if not user:
         return no_cache_redirect("/login")
+        
+    if user.get("is_admin"):
+        return no_cache_redirect("/admin/dashboard")
 
     from database import db
     if db is not None:
@@ -5656,6 +5800,40 @@ async def payment_cancel(request: Request, transaction_id: str = Form(...)):
     return RedirectResponse(url=f"/buyer/orders?cancelled={transaction_id}", status_code=303)
 
 
+@app.get("/api/payment/list")
+async def get_all_payments(admin: dict = Depends(require_admin)):
+    """Admin endpoint to list all escrow payments."""
+    from database import db
+    if db is None:
+        return JSONResponse({"success": False, "error": "Database not available"}, status_code=500)
+    
+    try:
+        payments = await db["payments"].find({}).sort("created_at", -1).to_list(length=1000)
+        clean_payments = []
+        for p in payments:
+            clean_p = {
+                "payment_id": p.get("payment_id"),
+                "transaction_id": p.get("transaction_id"),
+                "order_id": p.get("order_id"),
+                "bid_id": p.get("bid_id"),
+                "buyer_id": p.get("buyer_id"),
+                "supplier_id": p.get("supplier_id"),
+                "amount": p.get("amount", 0.0),
+                "original_amount": p.get("original_amount", 0.0),
+                "original_currency": p.get("original_currency", "BDT"),
+                "base_amount_usd": p.get("base_amount_usd", 0.0),
+                "exchange_rate": p.get("exchange_rate", 1.0),
+                "status": p.get("status"),
+                "created_at": p.get("created_at").isoformat() + 'Z' if isinstance(p.get("created_at"), datetime) else str(p.get("created_at"))
+            }
+            clean_payments.append(clean_p)
+            
+        return {"success": True, "payments": clean_payments}
+    except Exception as e:
+        print(f"Error fetching payments: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
 class ReleasePaymentRequest(BaseModel):
     payment_id: str
 
@@ -7531,9 +7709,8 @@ async def websocket_chat(websocket: WebSocket, rfq_id: str, user_id: str):
             broadcast.pop("_id", None)
 
             # Send to the specific receiver if connected
+            # (No echo back to sender — the frontend renders sent messages locally)
             await manager.send_personal_message(broadcast, rfq_id, receiver_id)
-            # Echo back to sender for confirmation
-            await manager.send_personal_message(broadcast, rfq_id, user_id)
 
             # Create notification for the receiver
             if receiver_id and db is not None:
@@ -7619,8 +7796,8 @@ async def send_chat_message(rfq_id: str, request: Request, user: dict = Depends(
     # Also push via WebSocket if connected
     broadcast = {**msg, "timestamp": msg["timestamp"].isoformat() + "Z"}
     broadcast.pop("_id", None)
+    # Send only to receiver — sender already rendered the message locally
     await manager.send_personal_message(broadcast, rfq_id, receiver_id)
-    await manager.send_personal_message(broadcast, rfq_id, user_id)
 
     # Create notification for the receiver
     if receiver_id and db is not None:
@@ -7664,13 +7841,27 @@ async def send_chat_message(rfq_id: str, request: Request, user: dict = Depends(
 
 
 @app.post("/api/chat/upload-image")
-async def upload_chat_image(file: UploadFile = File(...), user: dict = Depends(require_login)):
-    """Upload an image for chat. Returns a URL that can be embedded in a message."""
+async def upload_chat_image(
+    request: Request,
+    file: UploadFile = File(None),
+    image: UploadFile = File(None),
+    user: dict = Depends(require_login),
+):
+    """Upload an image for chat. Returns a URL that can be embedded in a message.
+    
+    Accepts the file under either field name 'file' or 'image' for
+    backwards compatibility with both buyer and supplier frontends.
+    """
     import uuid as _uuid
     import os
 
+    # Accept whichever field was provided
+    upload = file or image
+    if upload is None:
+        raise HTTPException(status_code=400, detail="No image file provided. Send as 'file' or 'image'.")
+
     allowed_types = ["image/jpeg", "image/png", "image/gif", "image/webp"]
-    if file.content_type not in allowed_types:
+    if upload.content_type not in allowed_types:
         raise HTTPException(status_code=400, detail="Only JPEG, PNG, GIF, and WebP images are allowed")
 
     # Create uploads directory if it doesn't exist
@@ -7678,19 +7869,20 @@ async def upload_chat_image(file: UploadFile = File(...), user: dict = Depends(r
     os.makedirs(upload_dir, exist_ok=True)
 
     # Generate unique filename
-    ext = file.filename.split(".")[-1] if "." in file.filename else "png"
+    ext = upload.filename.split(".")[-1] if "." in upload.filename else "png"
     filename = f"{_uuid.uuid4().hex[:12]}.{ext}"
     filepath = os.path.join(upload_dir, filename)
 
     # Save file
-    file_bytes = await file.read()
+    file_bytes = await upload.read()
     if len(file_bytes) > 5 * 1024 * 1024:  # 5MB limit
         raise HTTPException(status_code=400, detail="Image must be under 5MB")
 
     with open(filepath, "wb") as f:
         f.write(file_bytes)
 
-    return {"success": True, "url": f"/uploads/chat/{filename}"}
+    # Return url under both field names for compatibility
+    return {"success": True, "url": f"/uploads/chat/{filename}", "image_url": f"/uploads/chat/{filename}"}
 
 
 @app.get("/api/chat/{rfq_id}/history")

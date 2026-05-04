@@ -126,11 +126,11 @@
                 <p class="text-sm text-gray-500 mb-6">One-time payment for 30 days of premium access</p>
                 
                 {% if user %}
-                    <a href="/pricing" class="inline-block bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-bold py-4 px-8 rounded-lg text-lg shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1">
+                    <a href="/pricing?return_to={{ request.url.path }}" class="inline-block bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-bold py-4 px-8 rounded-lg text-lg shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1">
                         Upgrade to Premium Now
                     </a>
                 {% else %}
-                    <a href="/login" class="inline-block bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-bold py-4 px-8 rounded-lg text-lg shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1">
+                    <a href="/login?next={{ request.url.path }}" class="inline-block bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-bold py-4 px-8 rounded-lg text-lg shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1">
                         Log In to Upgrade
                     </a>
                 {% endif %}

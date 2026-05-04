@@ -44,10 +44,10 @@
     <!-- Navigation -->
     <nav class="bg-brand-dark bg-opacity-95 backdrop-blur shadow-md sticky top-0 z-50 transition-all duration-300">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-20 items-center">
+            <div class="flex justify-between items-center h-20">
                 <!-- Logo -->
-                <div class="flex items-center -ml-4 md:-ml-8 lg:-ml-12">
-                    <a href="/" class="flex-shrink-0 flex items-center gap-3 group">
+                <div class="flex items-center flex-shrink-0">
+                    <a href="/" class="flex items-center gap-3 group">
                         <!-- Logo mark -->
                         <div class="relative w-10 h-10 flex items-center justify-center">
                             <div
@@ -65,7 +65,7 @@
                 </div>
 
                 <!-- Desktop Menu -->
-                <div class="hidden lg:ml-8 lg:flex lg:space-x-8 items-center">
+                <div class="hidden lg:flex lg:items-center lg:space-x-6 flex-1 justify-center">
                     <a href="/"
                         class="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors">Home</a>
                     
@@ -162,44 +162,8 @@
                 </div>
 
                 <!-- CTA buttons -->
-                <div class="hidden lg:flex items-center space-x-5">
+                <div class="hidden lg:flex items-center space-x-3">
                     {% if user %}
-                        <!-- Notification Bell -->
-                        <div class="relative">
-                            <button id="notification-bell" class="text-gray-300 hover:text-white transition-colors relative">
-                                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
-                                </svg>
-                                <!-- Unread Badge -->
-                                <span id="notification-badge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">0</span>
-                            </button>
-                            
-                            <!-- Notification Dropdown -->
-                            <div id="notification-dropdown" class="hidden absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-2xl border border-gray-200 z-50 max-h-[500px] overflow-hidden flex flex-col">
-                                <!-- Header -->
-                                <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-blue-50 to-blue-100">
-                                    <h3 class="text-lg font-bold text-gray-900">Notifications</h3>
-                                    <button id="mark-all-read" class="text-xs text-blue-600 hover:text-blue-800 font-semibold">Mark all read</button>
-                                </div>
-                                
-                                <!-- Notification List -->
-                                <div id="notification-list" class="overflow-y-auto flex-1">
-                                    <!-- Notifications will be loaded here -->
-                                    <div class="p-8 text-center text-gray-500">
-                                        <svg class="h-12 w-12 mx-auto mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
-                                        </svg>
-                                        <p class="text-sm">Loading notifications...</p>
-                                    </div>
-                                </div>
-                                
-                                <!-- Footer -->
-                                <div class="px-4 py-3 border-t border-gray-200 bg-gray-50">
-                                    <a href="/notifications" class="text-sm text-blue-600 hover:text-blue-800 font-semibold block text-center">View all notifications</a>
-                                </div>
-                            </div>
-                        </div>
-                        
                         <!-- User Dropdown -->
                         <div class="relative group">
                             <button class="text-gray-300 hover:text-white text-sm font-medium transition-colors flex items-center gap-2 cursor-pointer">
@@ -255,6 +219,42 @@
                                     </svg>
                                     Log Out
                                 </a>
+                            </div>
+                        </div>
+                        
+                        <!-- Notification Bell - Moved to the far right -->
+                        <div class="relative">
+                            <button id="notification-bell" class="text-gray-300 hover:text-white transition-colors relative p-2 rounded-lg hover:bg-white hover:bg-opacity-10">
+                                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+                                </svg>
+                                <!-- Unread Badge -->
+                                <span id="notification-badge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">0</span>
+                            </button>
+                            
+                            <!-- Notification Dropdown -->
+                            <div id="notification-dropdown" class="hidden absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-2xl border border-gray-200 z-50 max-h-[500px] overflow-hidden flex flex-col">
+                                <!-- Header -->
+                                <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-blue-50 to-blue-100">
+                                    <h3 class="text-lg font-bold text-gray-900">Notifications</h3>
+                                    <button id="mark-all-read" class="text-xs text-blue-600 hover:text-blue-800 font-semibold">Mark all read</button>
+                                </div>
+                                
+                                <!-- Notification List -->
+                                <div id="notification-list" class="overflow-y-auto flex-1">
+                                    <!-- Notifications will be loaded here -->
+                                    <div class="p-8 text-center text-gray-500">
+                                        <svg class="h-12 w-12 mx-auto mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
+                                        </svg>
+                                        <p class="text-sm">Loading notifications...</p>
+                                    </div>
+                                </div>
+                                
+                                <!-- Footer -->
+                                <div class="px-4 py-3 border-t border-gray-200 bg-gray-50">
+                                    <a href="/notifications" class="text-sm text-blue-600 hover:text-blue-800 font-semibold block text-center">View all notifications</a>
+                                </div>
                             </div>
                         </div>
                     {% else %}
@@ -322,7 +322,7 @@
                                 Us</a></li>
                         <li><a href="#"
                                 class="text-gray-400 hover:text-brand-light text-sm transition-colors">Contact</a></li>
-                        <li><a href="/admin/subscriptions" data-role="admin" id="admin-dashboard-link" class="text-gray-400 hover:text-purple-400 text-sm transition-colors">Admin Dashboard</a></li>
+                        <li><a href="/admin/dashboard" data-role="admin" id="admin-dashboard-link" class="text-gray-400 hover:text-purple-400 text-sm transition-colors">Admin Dashboard</a></li>
                         <li><a href="/admin/analytics" data-role="admin" id="admin-analytics-link" class="text-gray-400 hover:text-red-400 text-sm transition-colors">Admin Analytics</a></li>
                         <li><a href="#" class="text-gray-400 hover:text-brand-light text-sm transition-colors">Privacy
                                 Policy</a></li>

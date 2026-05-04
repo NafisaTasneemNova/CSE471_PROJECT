@@ -1,16 +1,9 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Profile - TexBid</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="/static/css/style.css">
-</head>
-<body class="bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen">
-    <!-- Navigation -->
-    {% include 'base.html' %}
+{% extends "base.html" %}
 
+{% block title %}My Profile - TexBid{% endblock %}
+
+{% block content %}
+<div class="bg-gradient-to-br from-slate-50 to-slate-100 min-h-[calc(100vh-5rem)]">
     <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <!-- Profile Header -->
         <div class="bg-white rounded-lg shadow-lg overflow-hidden mb-6">
@@ -150,63 +143,63 @@
             </div>
         </div>
     </div>
+</div>
 
-    <script>
-        function copyToClipboard(text) {
-            navigator.clipboard.writeText(text).then(() => {
-                alert('Company ID copied to clipboard!');
-            }).catch(err => {
-                console.error('Failed to copy:', err);
+<script>
+    function copyToClipboard(text) {
+        navigator.clipboard.writeText(text).then(() => {
+            alert('Company ID copied to clipboard!');
+        }).catch(err => {
+            console.error('Failed to copy:', err);
+        });
+    }
+
+    function confirmDeleteAccount() {
+        const confirmed = confirm(
+            '⚠️ WARNING: This action cannot be undone!\n\n' +
+            'Are you absolutely sure you want to delete your account?\n\n' +
+            'This will permanently delete:\n' +
+            '• Your user account\n' +
+            '• Your company profile\n' +
+            '• All your bids\n' +
+            '• All your RFQs\n' +
+            '• All associated data\n\n' +
+            'Type "DELETE" in the next prompt to confirm.'
+        );
+
+        if (confirmed) {
+            const confirmation = prompt('Type DELETE to confirm account deletion:');
+            
+            if (confirmation === 'DELETE') {
+                deleteAccount();
+            } else {
+                alert('Account deletion cancelled. The text did not match.');
+            }
+        }
+    }
+
+    async function deleteAccount() {
+        try {
+            const response = await fetch('/api/account/delete', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                }
             });
-        }
 
-        function confirmDeleteAccount() {
-            const confirmed = confirm(
-                '⚠️ WARNING: This action cannot be undone!\n\n' +
-                'Are you absolutely sure you want to delete your account?\n\n' +
-                'This will permanently delete:\n' +
-                '• Your user account\n' +
-                '• Your company profile\n' +
-                '• All your bids\n' +
-                '• All your RFQs\n' +
-                '• All associated data\n\n' +
-                'Type "DELETE" in the next prompt to confirm.'
-            );
+            const data = await response.json();
 
-            if (confirmed) {
-                const confirmation = prompt('Type DELETE to confirm account deletion:');
-                
-                if (confirmation === 'DELETE') {
-                    deleteAccount();
-                } else {
-                    alert('Account deletion cancelled. The text did not match.');
-                }
+            if (data.success) {
+                alert('✓ Your account has been permanently deleted.');
+                window.location.href = '/';
+            } else {
+                alert('❌ Error: ' + (data.error || 'Failed to delete account'));
             }
+        } catch (error) {
+            console.error('Error deleting account:', error);
+            alert('❌ An error occurred while deleting your account');
         }
-
-        async function deleteAccount() {
-            try {
-                const response = await fetch('/api/account/delete', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    }
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    alert('✓ Your account has been permanently deleted.');
-                    window.location.href = '/';
-                } else {
-                    alert('❌ Error: ' + (data.error || 'Failed to delete account'));
-                }
-            } catch (error) {
-                console.error('Error deleting account:', error);
-                alert('❌ An error occurred while deleting your account');
-            }
-        }
-    </script>
-</body>
-</html>
+    }
+</script>
+{% endblock %}

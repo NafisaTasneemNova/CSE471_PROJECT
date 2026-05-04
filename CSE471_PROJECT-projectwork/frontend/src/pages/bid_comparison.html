@@ -457,19 +457,24 @@ document.addEventListener('DOMContentLoaded', loadBidComparison);
 const CURRENT_USER_ID = "{{ user.id if user else '' }}";
 let chatSocket = null;
 let chatReceiverId = null;
+let chatReconnectTimer = null;
+let chatReconnectDelay = 1000;
+let chatPollTimer = null;
+let chatLastMsgTimestamp = null;
 
 function openChatDrawer(supplierId, supplierName) {
   chatReceiverId = supplierId;
+  chatLastMsgTimestamp = null;
   document.getElementById('chatSupplierName').textContent = supplierName;
   document.getElementById('chatRfqLabel').textContent = `RFQ: ${rfqData?.title || RFQ_ID}`;
   document.getElementById('chatDrawer').classList.remove('translate-x-full');
   document.getElementById('chatBackdrop').classList.remove('hidden');
   document.getElementById('chatMessages').innerHTML = '<div class="text-center py-8"><p class="text-xs text-gray-400">Loading messages...</p></div>';
 
-  // Load chat history
+  // Load chat history then connect WebSocket
   loadChatHistory(supplierId);
-  // Open WebSocket
   connectWebSocket();
+  startPolling();
 }
 
 function closeChatDrawer() {
@@ -480,6 +485,9 @@ function closeChatDrawer() {
   }
   chatSocket = null;
   chatReceiverId = null;
+  stopPolling();
+  clearTimeout(chatReconnectTimer);
+  chatReconnectDelay = 1000;
 }
 
 async function loadChatHistory(supplierId) {
@@ -490,6 +498,11 @@ async function loadChatHistory(supplierId) {
 
     if (data.success && data.messages.length > 0) {
       container.innerHTML = data.messages.map(m => renderChatBubble(m)).join('');
+      // Track the latest timestamp for polling dedup
+      const lastMsg = data.messages[data.messages.length - 1];
+      if (lastMsg && lastMsg.timestamp) {
+        chatLastMsgTimestamp = lastMsg.timestamp;
+      }
     } else {
       container.innerHTML = '<div class="text-center py-8"><div class="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-3"><svg class="h-6 w-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg></div><p class="text-xs text-gray-400">Start the conversation</p></div>';
     }
@@ -501,30 +514,36 @@ async function loadChatHistory(supplierId) {
 
 function connectWebSocket() {
   if (chatSocket && chatSocket.readyState === WebSocket.OPEN) chatSocket.close();
+  clearTimeout(chatReconnectTimer);
 
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
   chatSocket = new WebSocket(`${protocol}//${location.host}/ws/chat/${RFQ_ID}/${CURRENT_USER_ID}`);
 
   chatSocket.onopen = () => {
     document.getElementById('chatStatus').className = 'w-2 h-2 rounded-full bg-green-400';
+    chatReconnectDelay = 1000; // Reset backoff on successful connection
+    console.log('[Chat] WebSocket connected');
   };
 
   chatSocket.onmessage = (event) => {
     const msg = JSON.parse(event.data);
+    // Only show messages relevant to the current chat conversation
     if (msg.sender_id !== chatReceiverId && msg.receiver_id !== chatReceiverId) {
       return;
     }
-    const container = document.getElementById('chatMessages');
-    if (document.querySelector(`[data-msg-id="${msg.id}"]`)) return;
-    // Remove empty-state placeholder if present
-    const placeholder = container.querySelector('.text-center.py-8');
-    if (placeholder) placeholder.remove();
-    container.insertAdjacentHTML('beforeend', renderChatBubble(msg));
-    container.scrollTop = container.scrollHeight;
+    appendMessageIfNew(msg);
   };
 
-  chatSocket.onclose = () => {
+  chatSocket.onclose = (e) => {
     document.getElementById('chatStatus').className = 'w-2 h-2 rounded-full bg-gray-400';
+    console.log('[Chat] WebSocket closed, scheduling reconnect in', chatReconnectDelay, 'ms');
+    // Auto-reconnect with exponential backoff if drawer is still open
+    if (chatReceiverId) {
+      chatReconnectTimer = setTimeout(() => {
+        chatReconnectDelay = Math.min(chatReconnectDelay * 2, 15000);
+        connectWebSocket();
+      }, chatReconnectDelay);
+    }
   };
 
   chatSocket.onerror = () => {
@@ -532,10 +551,59 @@ function connectWebSocket() {
   };
 }
 
+// ─── Polling Fallback ───
+// When WebSocket drops, poll for new messages every 3 seconds
+function startPolling() {
+  stopPolling();
+  chatPollTimer = setInterval(async () => {
+    if (!chatReceiverId) return;
+    // Only poll if WebSocket is NOT connected (fallback)
+    if (chatSocket && chatSocket.readyState === WebSocket.OPEN) return;
+
+    try {
+      const res = await fetch(`/api/chat/${RFQ_ID}/history?receiver_id=${chatReceiverId}`);
+      const data = await res.json();
+      if (data.success && data.messages.length > 0) {
+        data.messages.forEach(m => appendMessageIfNew(m));
+      }
+    } catch (err) {
+      console.error('[Chat] Polling error:', err);
+    }
+  }, 3000);
+}
+
+function stopPolling() {
+  if (chatPollTimer) {
+    clearInterval(chatPollTimer);
+    chatPollTimer = null;
+  }
+}
+
+// ─── Append Message with Dedup ───
+function appendMessageIfNew(msg) {
+  const container = document.getElementById('chatMessages');
+  if (!container) return;
+  // Skip if already rendered (dedup by message id)
+  if (msg.id && document.querySelector(`[data-msg-id="${msg.id}"]`)) return;
+
+  // Remove empty-state placeholder if present
+  const placeholder = container.querySelector('.text-center.py-8');
+  if (placeholder) placeholder.remove();
+
+  container.insertAdjacentHTML('beforeend', renderChatBubble(msg));
+  container.scrollTop = container.scrollHeight;
+
+  // Track latest timestamp
+  if (msg.timestamp) chatLastMsgTimestamp = msg.timestamp;
+}
+
 async function sendChatMessage(imageUrl = '') {
   const input = document.getElementById('chatInput');
   const content = input.value.trim();
   if (!content && !imageUrl) return;
+
+  // Generate a temporary ID for optimistic local rendering
+  const tempId = 'tmp-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
 
   const msgData = {
     content: content,
@@ -543,6 +611,19 @@ async function sendChatMessage(imageUrl = '') {
     image_url: imageUrl
   };
 
+  // ── Optimistic local render ──
+  const localMsg = {
+    id: tempId,
+    sender_id: CURRENT_USER_ID,
+    receiver_id: chatReceiverId,
+    content: content,
+    image_url: imageUrl,
+    timestamp: new Date().toISOString(),
+  };
+  appendMessageIfNew(localMsg);
+  input.value = '';
+
+  // ── Send via WebSocket or HTTP fallback ──
   if (chatSocket && chatSocket.readyState === WebSocket.OPEN) {
     chatSocket.send(JSON.stringify(msgData));
   } else {
@@ -554,22 +635,13 @@ async function sendChatMessage(imageUrl = '') {
         body: JSON.stringify(msgData)
       });
       const data = await res.json();
-      if (data.success) {
-        // Manually render if fallback used, since websocket won't push back
-        const container = document.getElementById('chatMessages');
-        if (!document.querySelector(`[data-msg-id="${data.message.id}"]`)) {
-            const placeholder = container.querySelector('.text-center.py-8');
-            if (placeholder) placeholder.remove();
-            container.insertAdjacentHTML('beforeend', renderChatBubble(data.message));
-            container.scrollTop = container.scrollHeight;
-        }
+      if (!data.success) {
+        console.error('HTTP send failed:', data);
       }
     } catch (err) {
       console.error("Failed to send message via HTTP fallback:", err);
-      alert("Failed to send message.");
     }
   }
-  input.value = '';
 }
 
 async function uploadChatImage() {
@@ -612,14 +684,13 @@ async function uploadChatImage() {
     document.getElementById(loadingId)?.remove();
 
     if (data.success) {
-      sendChatMessage(data.url);
+      sendChatMessage(data.url || data.image_url);
     } else {
       alert(data.detail || "Upload failed");
     }
   } catch (err) {
     console.error("Upload error:", err);
     alert("An error occurred during upload.");
-    document.getElementById('loading-' + Date.now())?.remove(); // Best effort cleanup
   } finally {
     input.value = '';
   }
@@ -634,7 +705,7 @@ function renderChatBubble(msg) {
 
   let imageHtml = '';
   if (msg.image_url) {
-    imageHtml = `<img src="${msg.image_url}" class="max-w-full h-auto rounded-lg mb-2 max-h-48 object-cover cursor-pointer" onclick="window.open('${msg.image_url}', '_blank')">`;
+    imageHtml = `<img src="${msg.image_url}" class="max-w-full h-auto rounded-lg mb-2 max-h-48 object-cover cursor-pointer" onclick="window.open('${msg.image_url}', '_blank')" onerror="this.style.display='none'">`;
   }
   
   let contentHtml = '';
